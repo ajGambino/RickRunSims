@@ -101,3 +101,128 @@ Planned enhancements include:
 ```bash
 python src/main.py --tournament masters_2026 --sims 10000
 ```
+
+---
+
+## How It Works
+
+The simulation engine is structured as a modular pipeline that separates data ingestion, feature engineering, probability modeling, and simulation execution.
+
+### 1. Data Layer
+
+Raw data (CSV, API, or private datasets) is loaded through adapter classes and normalized into internal schemas:
+
+- `PlayerProfile`
+- `CourseProfile`
+- `HoleProfile`
+- `TournamentConfig`
+
+This ensures the simulation engine is decoupled from any specific data source.
+
+---
+
+### 2. Feature / Rating Layer
+
+Player and course data are transformed into simulation ready inputs, such as:
+
+- Skill components (OTT, approach by distance, around green, putting)
+- Outcome tendencies (birdie, par, bogey rates)
+- Accuracy and consistency metrics
+- Volatility and course fit adjustments
+
+This layer defines the inputs used by the probability model.
+
+---
+
+### 3. Probability Model (Rule-based / ML)
+
+A probability model converts player and hole inputs into outcome probabilities.
+
+Example output:
+
+    {
+        "birdie": 0.22,
+        "par": 0.58,
+        "bogey": 0.18,
+        "double+": 0.02
+    }
+
+The current implementation uses rule based logic, but the interface is designed to support future machine learning models without changing the simulation engine.
+
+---
+
+### 4. Simulation Engine (Monte Carlo)
+
+The tournament is simulated hole by hole using probabilistic sampling:
+
+- Each hole outcome is sampled based on player specific probabilities
+- Rounds are aggregated from hole results
+- Cut rules are applied after the appropriate round
+- Final standings are determined after all rounds
+
+This process is repeated thousands of times to estimate outcome distributions.
+
+---
+
+### 5. Output & Aggregation
+
+Results from all simulations are aggregated into:
+
+- Win probabilities
+- Top 5 / Top 10 probabilities
+- Make cut percentages
+- Score distributions
+
+These outputs can be used for analysis, validation, or comparison to market odds.
+
+---
+
+### System Flow
+
+    Raw Data → Adapter → Player/Course Profiles → Feature Layer → Probability Model → Simulation Engine → Aggregated Results
+
+---
+
+## System Architecture
+
+    ┌──────────────┐
+    │   Raw Data   │
+    │ (CSV / API)  │
+    └──────┬───────┘
+           │
+           ▼
+    ┌──────────────┐
+    │   Adapters   │
+    │ (Data Layer) │
+    └──────┬───────┘
+           │
+           ▼
+    ┌────────────────────┐
+    │  Internal Schemas  │
+    │ Player / Course    │
+    │ Hole / Tournament  │
+    └──────┬─────────────┘
+           │
+           ▼
+    ┌────────────────────┐
+    │ Feature / Ratings  │
+    │  (Skill Profiles)  │
+    └──────┬─────────────┘
+           │
+           ▼
+    ┌────────────────────┐
+    │ Probability Model  │
+    │ (Rule-based / ML)  │
+    └──────┬─────────────┘
+           │
+           ▼
+    ┌────────────────────┐
+    │ Simulation Engine  │
+    │  (Monte Carlo)     │
+    └──────┬─────────────┘
+           │
+           ▼
+    ┌────────────────────┐
+    │ Aggregated Results │
+    │ Win / Top 10 / Cut │
+    └────────────────────┘

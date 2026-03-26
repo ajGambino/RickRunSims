@@ -24,8 +24,4 @@ Thumbs.db
 secrets.json
 
 # notes
-notes/architecture_plan.txt
-notes/files.txt
-notes/future.txt
-notes/masters.txt
-notes/notes.txt
+notes/*.txt
