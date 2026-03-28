@@ -33,8 +33,12 @@ VOLATILITY_MIN = 0.0
 VOLATILITY_MAX = 1.0
 TRAIT_MIN = -0.5
 TRAIT_MAX = 0.5
-PAR_SKILL_MIN = -15
-PAR_SKILL_MAX = 15
+PAR3_SKILL_MIN = -2
+PAR3_SKILL_MAX = 2
+PAR4_SKILL_MIN = -2
+PAR4_SKILL_MAX = 2
+PAR5_SKILL_MIN = -3
+PAR5_SKILL_MAX = 3
 CONSISTENCY_MIN = 0.0
 CONSISTENCY_MAX = 1.0
 AGGRESSION_MIN = 0.0
@@ -216,10 +220,10 @@ def _parse_player_row(row: dict, row_num: int) -> PlayerProfile:
                 f"got: {bogey_avoidance}"
             )
 
-    # Par-specific skill modifiers
-    par3_skill = _parse_optional_float(row, "par3_skill", 0.0, PAR_SKILL_MIN, PAR_SKILL_MAX)
-    par4_skill = _parse_optional_float(row, "par4_skill", 0.0, PAR_SKILL_MIN, PAR_SKILL_MAX)
-    par5_skill = _parse_optional_float(row, "par5_skill", 0.0, PAR_SKILL_MIN, PAR_SKILL_MAX)
+    # Par-specific skill modifiers (tightened ranges for calibration)
+    par3_skill = _parse_optional_float(row, "par3_skill", 0.0, PAR3_SKILL_MIN, PAR3_SKILL_MAX)
+    par4_skill = _parse_optional_float(row, "par4_skill", 0.0, PAR4_SKILL_MIN, PAR4_SKILL_MAX)
+    par5_skill = _parse_optional_float(row, "par5_skill", 0.0, PAR5_SKILL_MIN, PAR5_SKILL_MAX)
 
     # Play-style traits
     consistency = _parse_optional_float(row, "consistency", 0.0, CONSISTENCY_MIN, CONSISTENCY_MAX)
