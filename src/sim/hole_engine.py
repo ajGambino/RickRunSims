@@ -53,14 +53,15 @@ def simulate_hole(
 
     # Apply par-specific skill adjustment to base skill
     # Par-specific skills are modest modifiers (-2 to +2 for par3/4, -3 to +3 for par5)
-    # Applied at 40% strength to keep them subtle - they add flavor, not dominance
+    # Applied at reduced strength - par5_skill is ESPECIALLY dampened to control eagle inflation
     par_adjustment = 0.0
     if hole.par == 3:
         par_adjustment = par3_skill * 0.40
     elif hole.par == 4:
         par_adjustment = par4_skill * 0.40
     elif hole.par == 5:
-        par_adjustment = par5_skill * 0.40
+        # Par-5 skill scaling HEAVILY REDUCED from 0.40 to 0.25 - this is the main eagle source
+        par_adjustment = par5_skill * 0.25
 
     # Effective skill for this hole type
     skill = base_skill + par_adjustment
@@ -73,10 +74,10 @@ def simulate_hole(
     # - Bogeys happen (15-20%)
     # - Doubles+ are occasional (3-5%)
     baseline = {
-        "eagle": 0.00005,  # 0.005% - eagles are extremely rare (will be amplified by modifiers)
-        "birdie": 0.090,   # 9% - birdie rate for pros
-        "par": 0.75495,    # 75.495% - par is most common
-        "bogey": 0.115,    # 11.5% - bogeys happen
+        "eagle": 0.00001,  # 0.001% - eagles are extremely rare (will be amplified by modifiers)
+        "birdie": 0.091,   # 9.1% - birdie rate for pros (slightly increased to preserve scoring)
+        "par": 0.75499,    # 75.499% - par is most common
+        "bogey": 0.114,    # 11.4% - bogeys happen
         "double": 0.04,    # 4% - doubles are uncommon
     }
 
@@ -91,35 +92,42 @@ def simulate_hole(
     probs = baseline.copy()
 
     # Skill adjustments: better players get more birdies/eagles, fewer bogeys/doubles
-    # REDUCED from 0.2 to 0.06 - skill effects should be subtle, not dominant
+    # Eagle and birdie are now SEPARATED - they scale differently
+    # Eagle is a rare event bucket with minimal skill sensitivity
+    # Birdie is the primary scoring upside bucket
     if skill_factor > 0:  # Better than average
         shift = skill_factor * 0.06  # Max 6% shift for elite players
-        probs["eagle"] += shift * 0.03  # Reduced from 0.05 to 0.03
-        probs["birdie"] += shift * 0.62
+        # Eagle: EXTREMELY minimal skill sensitivity (treat as rare event)
+        eagle_shift = shift * 0.003  # AGGRESSIVELY REDUCED from 0.008 to 0.003 - eagles barely scale with skill
+        # Birdie: main scoring improvement bucket (compensate for reduced eagle)
+        birdie_shift = shift * 0.655  # Slightly increased from 0.65 to maintain scoring
+
+        probs["eagle"] += eagle_shift
+        probs["birdie"] += birdie_shift
         probs["par"] -= shift * 0.20
         probs["bogey"] -= shift * 0.35
         probs["double"] -= shift * 0.10
     else:  # Worse than average
         shift = abs(skill_factor) * 0.06
-        probs["eagle"] -= shift * 0.01  # Reduced from 0.02 to 0.01
-        probs["birdie"] -= shift * 0.51
+        probs["eagle"] -= shift * 0.001  # AGGRESSIVELY REDUCED from 0.003 to 0.001
+        probs["birdie"] -= shift * 0.522
         probs["par"] -= shift * 0.08
         probs["bogey"] += shift * 0.45
         probs["double"] += shift * 0.15
 
     # Difficulty adjustments: harder holes = fewer birdies, more bogeys
-    # REDUCED from 0.3 to 0.12 - difficulty should matter but not dominate
+    # Eagle sensitivity is MINIMAL - eagles are rare events on any difficulty
     if difficulty_factor > 0:  # Harder hole
         shift = difficulty_factor * 0.12  # Scale with difficulty
-        probs["eagle"] -= shift * 0.03  # Reduced from 0.05 to 0.03
-        probs["birdie"] -= shift * 0.50
+        probs["eagle"] -= shift * 0.003  # AGGRESSIVELY REDUCED from 0.008 to 0.003 - eagles barely affected by difficulty
+        probs["birdie"] -= shift * 0.527
         probs["par"] -= shift * 0.07
         probs["bogey"] += shift * 0.40
         probs["double"] += shift * 0.20
     else:  # Easier hole
         shift = abs(difficulty_factor) * 0.12
-        probs["eagle"] += shift * 0.05  # Reduced from 0.08 to 0.05
-        probs["birdie"] += shift * 0.60
+        probs["eagle"] += shift * 0.005  # AGGRESSIVELY REDUCED from 0.012 to 0.005 - eagles barely affected by difficulty
+        probs["birdie"] += shift * 0.645
         probs["par"] -= shift * 0.10
         probs["bogey"] -= shift * 0.35
         probs["double"] -= shift * 0.15
@@ -131,11 +139,13 @@ def simulate_hole(
     probs["par"] += bogey_avoid - birdie_boost  # Rebalance
 
     # Aggression: increases eagles/birdies AND bogeys/doubles (risk-reward)
-    # REDUCED from 0.15 to 0.04 - aggression should be noticeable but subtle
+    # Eagle bucket is HEAVILY CAPPED - aggression mainly affects birdie/bogey trade-off
     if aggression > 0:
         agg_shift = aggression * 0.04  # Max 4% shift for max aggression
-        probs["eagle"] += agg_shift * 0.08  # Reduced from 0.10 to 0.08
-        probs["birdie"] += agg_shift * 0.55
+        # Eagle: EXTREMELY minimal aggression sensitivity - rare event bucket stays capped
+        probs["eagle"] += agg_shift * 0.01  # AGGRESSIVELY REDUCED from 0.02 to 0.01 - aggression barely touches eagles
+        # Birdie: main upside from aggression (compensate for reduced eagle)
+        probs["birdie"] += agg_shift * 0.62  # Increased from 0.61 to preserve risk-reward profile
         probs["par"] -= agg_shift * 0.83
         probs["bogey"] += agg_shift * 0.15
         probs["double"] += agg_shift * 0.05
@@ -156,10 +166,12 @@ def simulate_hole(
         probs["par"] += minor_reduction
 
     # Volatility increases extremes (eagles and doubles)
-    # REDUCED from 0.1 to 0.02 - volatility should add flavor, not dominate
+    # Eagle bucket is HEAVILY CAPPED - volatility mainly increases doubles, not eagles
     vol_shift = volatility * 0.02
-    probs["eagle"] += vol_shift * 0.20  # Reduced from 0.25 to 0.20
-    probs["double"] += vol_shift * 0.60
+    # Eagle: EXTREMELY minimal volatility sensitivity - rare event bucket stays capped
+    probs["eagle"] += vol_shift * 0.02  # AGGRESSIVELY REDUCED from 0.05 to 0.02 - volatility barely touches eagles
+    # Double: main downside from volatility (asymmetric risk profile is OK, compensate for reduced eagle)
+    probs["double"] += vol_shift * 0.78  # Increased from 0.75 to preserve volatility character
     probs["par"] -= vol_shift * 0.80
 
     # Ensure no negative probabilities
@@ -171,10 +183,54 @@ def simulate_hole(
     for key in probs:
         probs[key] /= total
 
+    # HARD CAP on eagle probability AFTER normalization to control rare event bucket
+    # Target overall eagle rate ~2%, so cap individual hole probabilities aggressively
+    MAX_EAGLE_PROB = 0.008  # 0.8% hard cap (very aggressive to hit ~2% tournament average)
+    orig_eagle = probs["eagle"]
+    if probs["eagle"] > MAX_EAGLE_PROB:
+        excess = probs["eagle"] - MAX_EAGLE_PROB
+        probs["eagle"] = MAX_EAGLE_PROB
+        # Redistribute excess to birdie (preserve scoring upside)
+        probs["birdie"] += excess
+        # Re-normalize after capping
+        total = sum(probs.values())
+        for key in probs:
+            probs[key] /= total
+
     # Sample from distribution
     outcomes = ["eagle", "birdie", "par", "bogey", "double"]
     weights = [probs[o] for o in outcomes]
+
+    # DEBUG: Log first 5 holes to audit probability -> outcome pipeline
+    if not hasattr(simulate_hole, 'debug_count'):
+        simulate_hole.debug_count = 0
+    if simulate_hole.debug_count < 5:
+        print(f"\n=== HOLE SIMULATION DEBUG #{simulate_hole.debug_count + 1} ===")
+        print(f"Player: {player_rating.get('name', 'Unknown')}")
+        print(f"Hole: Par {hole.par}, Difficulty {hole.difficulty}")
+        print(f"Probabilities passed to sampling:")
+        for outcome in outcomes:
+            print(f"  {outcome}: {probs[outcome]:.6f} ({probs[outcome]*100:.4f}%)")
+        simulate_hole.debug_count += 1
+
     result = rng.choices(outcomes, weights=weights, k=1)[0]
+
+    # DEBUG: Log sampled outcome
+    if simulate_hole.debug_count <= 5:
+        print(f"Sampled outcome: {result}")
+        print(f"Score: {hole.par - 2 if result == 'eagle' else hole.par - 1 if result == 'birdie' else hole.par if result == 'par' else hole.par + 1 if result == 'bogey' else hole.par + 2}")
+
+    # DEBUG: Track aggregate eagle probability stats
+    if not hasattr(simulate_hole, 'eagle_prob_sum'):
+        simulate_hole.eagle_prob_sum = 0.0
+        simulate_hole.eagle_prob_count = 0
+        simulate_hole.eagle_outcome_count = 0
+        simulate_hole.total_outcomes = 0
+    simulate_hole.eagle_prob_sum += probs["eagle"]
+    simulate_hole.eagle_prob_count += 1
+    simulate_hole.total_outcomes += 1
+    if result == "eagle":
+        simulate_hole.eagle_outcome_count += 1
 
     # Convert to absolute score
     score_map = {

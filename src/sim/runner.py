@@ -108,4 +108,18 @@ def run_monte_carlo(
     # Sort by win percentage (descending)
     summary_rows.sort(key=lambda x: x.win_pct, reverse=True)
 
+    # DEBUG: Print eagle probability audit
+    from src.sim.hole_engine import simulate_hole
+    if hasattr(simulate_hole, 'eagle_prob_count') and simulate_hole.eagle_prob_count > 0:
+        avg_eagle_prob = simulate_hole.eagle_prob_sum / simulate_hole.eagle_prob_count
+        realized_eagle_rate = simulate_hole.eagle_outcome_count / simulate_hole.total_outcomes
+        print(f"\n{'='*80}")
+        print(f"EAGLE PROBABILITY AUDIT")
+        print(f"{'='*80}")
+        print(f"Total holes simulated: {simulate_hole.total_outcomes:,}")
+        print(f"Average eagle probability passed to sampling: {avg_eagle_prob:.6f} ({avg_eagle_prob*100:.4f}%)")
+        print(f"Realized eagle frequency from sampling: {realized_eagle_rate:.6f} ({realized_eagle_rate*100:.4f}%)")
+        print(f"Total eagles sampled: {simulate_hole.eagle_outcome_count:,}")
+        print(f"{'='*80}\n")
+
     return summary_rows, diagnostics
