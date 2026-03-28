@@ -98,8 +98,10 @@ Planned enhancements include:
 
 ## Quick Start
 
+### Running with Built-in Demo Data
+
 ```bash
-# Run with default settings (1000 simulations)
+# Run with default settings (1000 simulations, built-in demo players)
 python run.py --tournament masters_2026 --sims 1000
 
 # Run with custom seed for reproducibility
@@ -109,11 +111,74 @@ python run.py --tournament masters_2026 --sims 5000 --seed 42
 python run.py --tournament masters_2026 --sims 1000 --top 10
 ```
 
+### Running with Custom CSV Data
+
+```bash
+# Use a custom player CSV file
+python run.py --tournament masters_2026 --sims 1000 --player-csv data/demo/players/small_field_demo.csv
+
+# Or use your own CSV file
+python run.py --tournament masters_2026 --sims 1000 --player-csv path/to/your/players.csv
+```
+
 **Command line options:**
 - `--tournament`: Tournament to simulate (default: `masters_2026`)
 - `--sims`: Number of Monte Carlo simulations (default: 1000)
 - `--seed`: Random seed for reproducibility (optional)
 - `--top`: Number of top players to display in results (default: 20)
+- `--player-csv`: Path to CSV file with player data (optional, uses built-in demo data if not specified)
+- `--export-summary`: Export Monte Carlo summary to CSV file (optional)
+- `--export-leaderboard`: Export a representative tournament leaderboard to CSV file (optional)
+
+### CSV File Format
+
+Player CSV files must include these columns:
+
+**Required columns:**
+- `player_id`: Unique identifier (string)
+- `name`: Player name (string)
+- `skill_rating`: Player skill level, 0-100 scale where higher = better (numeric)
+- `volatility`: Variance in performance, 0-1 scale where higher = more variance (numeric)
+
+**Optional columns (legacy, still supported):**
+- `birdie_boost`: Modifier for birdie probability, -0.5 to 0.5 (numeric, default: 0.0)
+- `bogey_avoidance`: Modifier for bogey avoidance, -0.5 to 0.5 (numeric, default: 0.0)
+
+**Optional columns (par-specific skills):**
+- `par3_skill`: Skill adjustment for par 3 holes, -15 to 15 (numeric, default: 0.0)
+- `par4_skill`: Skill adjustment for par 4 holes, -15 to 15 (numeric, default: 0.0)
+- `par5_skill`: Skill adjustment for par 5 holes, -15 to 15 (numeric, default: 0.0)
+
+**Optional columns (play-style traits):**
+- `consistency`: Pulls outcomes toward par, 0-1 scale (numeric, default: 0.0)
+- `aggression`: Increases eagles/birdies AND bogeys/doubles, 0-1 scale (numeric, default: 0.0)
+
+**Example CSV:**
+```csv
+player_id,name,skill_rating,volatility,birdie_boost,bogey_avoidance,par3_skill,par4_skill,par5_skill,consistency,aggression
+P001,Elite Player,95,0.25,0.12,0.15,2,1,2,0.20,0.30
+P002,Strong Contender,88,0.30,0.10,0.12,0,2,4,0.15,0.35
+P003,Consistent Pro,82,0.22,0.08,0.14,1,1,1,0.50,0.10
+```
+
+Sample CSV files are provided in [data/demo/players/](data/demo/players/).
+
+### Exporting Results
+
+```bash
+# Export Monte Carlo summary statistics
+python run.py --tournament masters_2026 --sims 1000 --export-summary outputs/summary.csv
+
+# Export a representative tournament leaderboard
+python run.py --tournament masters_2026 --sims 1000 --export-leaderboard outputs/leaderboard.csv
+
+# Export both
+python run.py --tournament masters_2026 --sims 5000 --seed 42 --export-summary outputs/summary.csv --export-leaderboard outputs/leaderboard.csv
+```
+
+**Export formats:**
+- **Summary CSV**: Player-level aggregate statistics across all simulations (win %, top 5%, top 10%, make cut %, avg finish, avg score)
+- **Leaderboard CSV**: Single representative tournament results showing final standings, round-by-round scores, and cut status
 
 ---
 

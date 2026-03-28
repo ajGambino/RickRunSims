@@ -13,8 +13,19 @@ class PlayerProfile:
     name: str
     skill_rating: float  # Higher = better player (e.g., 0-100 scale)
     volatility: float  # Higher = more variance (e.g., 0-1 scale)
+
+    # Legacy optional traits (deprecated but supported for backward compatibility)
     birdie_boost: float = 0.0  # Optional trait: increases birdie probability
     bogey_avoidance: float = 0.0  # Optional trait: decreases bogey probability
+
+    # Par-specific skill modifiers (additive adjustments to skill_rating by hole type)
+    par3_skill: float = 0.0  # Modifier for par 3 holes (-10 to +10 typical)
+    par4_skill: float = 0.0  # Modifier for par 4 holes (-10 to +10 typical)
+    par5_skill: float = 0.0  # Modifier for par 5 holes (-10 to +10 typical)
+
+    # Play-style traits
+    consistency: float = 0.0  # Higher = less variance, more outcomes near par (0-1 scale)
+    aggression: float = 0.0  # Higher = more eagles/birdies but more bogeys/doubles (0-1 scale)
 
 
 @dataclass

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python run.py --tournament masters_2026 --sims 100 --seed 42 --player-csv data/demo/players/small_field_demo.csv --top 8)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

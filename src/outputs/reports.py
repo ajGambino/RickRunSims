@@ -49,7 +49,7 @@ def print_simulation_summary(
 
 def print_quick_summary(summary: List[SimulationSummaryRow], top_n: int = 5):
     """
-    Print a quick summary of top contenders.
+    Print a quick summary of top contenders and field statistics.
 
     Args:
         summary: List of SimulationSummaryRow objects
@@ -58,4 +58,12 @@ def print_quick_summary(summary: List[SimulationSummaryRow], top_n: int = 5):
     print(f"\nTop {top_n} Favorites:")
     for i, row in enumerate(summary[:top_n], 1):
         print(f"  {i}. {row.player_name}: {row.win_pct:.1f}% win probability")
+
+    # Field statistics
+    if summary:
+        avg_cut_pct = sum(r.make_cut_pct for r in summary) / len(summary)
+        avg_score = sum(r.avg_score for r in summary) / len(summary)
+        print(f"\nField Statistics:")
+        print(f"  Average make cut %: {avg_cut_pct:.1f}%")
+        print(f"  Average score to par: {avg_score:+.2f}")
     print()

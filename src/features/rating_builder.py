@@ -32,4 +32,9 @@ def build_player_rating(player: PlayerProfile) -> dict:
         "volatility": player.volatility,
         "birdie_boost": player.birdie_boost,
         "bogey_avoidance": player.bogey_avoidance,
+        "par3_skill": player.par3_skill,
+        "par4_skill": player.par4_skill,
+        "par5_skill": player.par5_skill,
+        "consistency": player.consistency,
+        "aggression": player.aggression,
     }
