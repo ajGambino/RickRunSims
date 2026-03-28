@@ -10,7 +10,8 @@ from src.features.rating_builder import build_player_rating
 from src.sim.runner import run_monte_carlo
 from src.sim.tournament_engine import simulate_tournament
 from src.outputs.reports import print_simulation_summary, print_quick_summary
-from src.outputs.export_csv import export_summary_csv, export_leaderboard_csv
+from src.outputs.export_csv import export_summary_csv, export_leaderboard_csv, export_diagnostics_csv
+from src.outputs.diagnostics_report import print_diagnostics_summary, print_top_players_diagnostics
 
 
 def main():
@@ -60,6 +61,17 @@ def main():
         default=None,
         help="Export a representative tournament leaderboard to CSV file (optional)",
     )
+    parser.add_argument(
+        "--diagnostics",
+        action="store_true",
+        help="Collect and display simulation diagnostics (scoring distributions, winning scores, etc.)",
+    )
+    parser.add_argument(
+        "--export-diagnostics",
+        type=str,
+        default=None,
+        help="Export diagnostics to CSV file (optional)",
+    )
 
     args = parser.parse_args()
 
@@ -96,11 +108,13 @@ def main():
     start_time = time.time()
 
     try:
-        summary = run_monte_carlo(
+        collect_diag = args.diagnostics or args.export_diagnostics is not None
+        summary, diagnostics = run_monte_carlo(
             player_ratings=player_ratings,
             config=config,
             num_sims=args.sims,
             seed=args.seed,
+            collect_diagnostics=collect_diag,
         )
     except Exception as e:
         print(f" Error running simulations: {e}")
@@ -138,6 +152,21 @@ def main():
         except Exception as e:
             print(f"\n✗ Error exporting leaderboard: {e}")
             return 1
+
+    # Display diagnostics if requested
+    if diagnostics:
+        if args.diagnostics:
+            print_diagnostics_summary(diagnostics, args.sims)
+            print_top_players_diagnostics(diagnostics, player_ratings, top_n=5)
+
+        # Export diagnostics if requested
+        if args.export_diagnostics:
+            try:
+                export_diagnostics_csv(diagnostics, args.export_diagnostics, args.sims)
+                exports_written.append(f"Diagnostics: {args.export_diagnostics}")
+            except Exception as e:
+                print(f"\nError exporting diagnostics: {e}")
+                return 1
 
     if exports_written:
         print(f"\nExports written:")

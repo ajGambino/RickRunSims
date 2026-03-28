@@ -5,6 +5,7 @@ import csv
 from pathlib import Path
 from typing import List
 from src.models.results import SimulationSummaryRow, TournamentSimResult
+from src.calibration.diagnostics import TournamentDiagnostics
 
 
 def export_summary_csv(
@@ -116,3 +117,61 @@ def export_leaderboard_csv(
                 round_scores[2] if len(round_scores) > 2 else "",
                 round_scores[3] if len(round_scores) > 3 else "",
             ])
+
+
+def export_diagnostics_csv(
+    diagnostics: TournamentDiagnostics,
+    output_path: str,
+    num_sims: int,
+):
+    """
+    Export diagnostics summary to CSV.
+
+    Args:
+        diagnostics: TournamentDiagnostics object
+        output_path: Path to output CSV file
+        num_sims: Number of simulations run
+
+    Raises:
+        IOError: If file cannot be written
+    """
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    summary = diagnostics.get_summary()
+
+    with open(output_file, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Write metadata
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["num_simulations", num_sims])
+        writer.writerow([])
+
+        # Write tournament-level metrics
+        writer.writerow(["Tournament Metrics", ""])
+        if "avg_winning_score" in summary:
+            writer.writerow(["avg_winning_score", f"{summary['avg_winning_score']:.2f}"])
+            writer.writerow(["std_winning_score", f"{summary['std_winning_score']:.2f}"])
+            writer.writerow(["min_winning_score", summary['min_winning_score']])
+            writer.writerow(["max_winning_score", summary['max_winning_score']])
+
+        if "avg_cut_line" in summary:
+            writer.writerow(["avg_cut_line", f"{summary['avg_cut_line']:.2f}"])
+            writer.writerow(["std_cut_line", f"{summary['std_cut_line']:.2f}"])
+
+        if "avg_field_score" in summary:
+            writer.writerow(["avg_field_score", f"{summary['avg_field_score']:.2f}"])
+            writer.writerow(["std_field_score", f"{summary['std_field_score']:.2f}"])
+
+        writer.writerow([])
+
+        # Write score distribution
+        writer.writerow(["Score Distribution", ""])
+        if "total_holes" in summary:
+            writer.writerow(["total_holes", summary['total_holes']])
+            writer.writerow(["eagle_rate_pct", f"{summary['eagle_rate']:.2f}"])
+            writer.writerow(["birdie_rate_pct", f"{summary['birdie_rate']:.2f}"])
+            writer.writerow(["par_rate_pct", f"{summary['par_rate']:.2f}"])
+            writer.writerow(["bogey_rate_pct", f"{summary['bogey_rate']:.2f}"])
+            writer.writerow(["double_plus_rate_pct", f"{summary['double_plus_rate']:.2f}"])

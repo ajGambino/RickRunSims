@@ -2,11 +2,12 @@
 Monte Carlo runner - runs many tournament simulations and aggregates results.
 """
 import random
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from collections import defaultdict
 from src.data.schemas import TournamentConfig
 from src.models.results import SimulationSummaryRow, TournamentSimResult
 from src.sim.tournament_engine import simulate_tournament
+from src.calibration.diagnostics import TournamentDiagnostics
 
 
 def run_monte_carlo(
@@ -14,7 +15,8 @@ def run_monte_carlo(
     config: TournamentConfig,
     num_sims: int,
     seed: Optional[int] = None,
-) -> List[SimulationSummaryRow]:
+    collect_diagnostics: bool = False,
+) -> Tuple[List[SimulationSummaryRow], Optional[TournamentDiagnostics]]:
     """
     Run Monte Carlo simulation of tournament.
 
@@ -23,9 +25,12 @@ def run_monte_carlo(
         config: TournamentConfig
         num_sims: Number of simulations to run
         seed: Random seed for reproducibility (optional)
+        collect_diagnostics: Whether to collect detailed diagnostics (optional)
 
     Returns:
-        List of SimulationSummaryRow objects with aggregated stats
+        Tuple of (summary_rows, diagnostics)
+        - summary_rows: List of SimulationSummaryRow objects
+        - diagnostics: TournamentDiagnostics object if collect_diagnostics=True, else None
     """
     # Initialize RNG
     base_rng = random.Random(seed)
@@ -42,6 +47,10 @@ def run_monte_carlo(
         "player_name": "",
     })
 
+    # Initialize diagnostics if requested
+    diagnostics = TournamentDiagnostics() if collect_diagnostics else None
+    course_par = config.course.total_par
+
     # Run simulations
     for sim_num in range(num_sims):
         # Create a new RNG for this simulation (for reproducibility)
@@ -50,6 +59,10 @@ def run_monte_carlo(
 
         # Run tournament
         result = simulate_tournament(player_ratings, config, sim_rng)
+
+        # Collect diagnostics if requested
+        if diagnostics:
+            diagnostics.record_tournament(result, course_par)
 
         # Aggregate stats
         for player_result in result.player_results:
@@ -95,4 +108,4 @@ def run_monte_carlo(
     # Sort by win percentage (descending)
     summary_rows.sort(key=lambda x: x.win_pct, reverse=True)
 
-    return summary_rows
+    return summary_rows, diagnostics

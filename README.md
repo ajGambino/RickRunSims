@@ -129,6 +129,8 @@ python run.py --tournament masters_2026 --sims 1000 --player-csv path/to/your/pl
 - `--player-csv`: Path to CSV file with player data (optional, uses built-in demo data if not specified)
 - `--export-summary`: Export Monte Carlo summary to CSV file (optional)
 - `--export-leaderboard`: Export a representative tournament leaderboard to CSV file (optional)
+- `--diagnostics`: Collect and display simulation diagnostics (optional)
+- `--export-diagnostics`: Export diagnostics to CSV file (optional)
 
 ### CSV File Format
 
@@ -179,6 +181,48 @@ python run.py --tournament masters_2026 --sims 5000 --seed 42 --export-summary o
 **Export formats:**
 - **Summary CSV**: Player-level aggregate statistics across all simulations (win %, top 5%, top 10%, make cut %, avg finish, avg score)
 - **Leaderboard CSV**: Single representative tournament results showing final standings, round-by-round scores, and cut status
+
+### Simulation Diagnostics
+
+Diagnostics help evaluate whether the simulation produces realistic outcomes by tracking scoring distributions, winning scores, cut lines, and player-level statistics.
+
+```bash
+# Display diagnostics in console
+python run.py --tournament masters_2026 --sims 1000 --diagnostics
+
+# Export diagnostics to CSV
+python run.py --tournament masters_2026 --sims 1000 --export-diagnostics outputs/diagnostics.csv
+
+# Both display and export
+python run.py --tournament masters_2026 --sims 5000 --seed 42 --diagnostics --export-diagnostics outputs/diagnostics.csv
+```
+
+**Diagnostic metrics tracked:**
+
+*Tournament-level:*
+- Average winning score (to par)
+- Winning score distribution (min, max, std dev)
+- Average cut line (to par)
+- Cut line distribution
+- Field average score
+
+*Score distribution (all players, all holes):*
+- Eagle rate %
+- Birdie rate %
+- Par rate %
+- Bogey rate %
+- Double+ rate %
+
+*Player-level (top N players):*
+- Average round score to par
+- Score standard deviation
+- Individual scoring distribution rates
+
+These metrics help answer questions like:
+- Are winning scores realistic for the course?
+- Is the cut line reasonable?
+- Are birdie/bogey rates in line with professional golf?
+- Are players too consistent or too volatile?
 
 ---
 
