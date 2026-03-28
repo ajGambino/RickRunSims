@@ -1,5 +1,5 @@
 """
-Core data schemas for RickRunSims.
+Core data schemas
 Lightweight internal dataclasses for player profiles, courses, and tournament configs.
 """
 from dataclasses import dataclass

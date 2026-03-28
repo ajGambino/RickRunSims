@@ -96,11 +96,24 @@ Planned enhancements include:
 
 ---
 
-## Example Run
+## Quick Start
 
 ```bash
-python src/main.py --tournament masters_2026 --sims 10000
+# Run with default settings (1000 simulations)
+python run.py --tournament masters_2026 --sims 1000
+
+# Run with custom seed for reproducibility
+python run.py --tournament masters_2026 --sims 5000 --seed 42
+
+# Show top 10 players only
+python run.py --tournament masters_2026 --sims 1000 --top 10
 ```
+
+**Command line options:**
+- `--tournament`: Tournament to simulate (default: `masters_2026`)
+- `--sims`: Number of Monte Carlo simulations (default: 1000)
+- `--seed`: Random seed for reproducibility (optional)
+- `--top`: Number of top players to display in results (default: 20)
 
 ---
 
