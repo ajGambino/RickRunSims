@@ -70,17 +70,17 @@ def simulate_hole(
 
     # Baseline probabilities for a neutral (skill 50) player on a neutral hole
     # Recalibrated for more realistic variance:
-    # - Increase eagles from 0.001% to provide meaningful eagle opportunities
-    # - Increase birdies to maintain scoring
-    # - Reduce par dominance to add variance
-    # - Increase bogeys to reflect realistic mistakes
-    # - Slight increase to doubles for downside variance
+    # - Maintain eagle opportunities
+    # - Reduce birdie rate slightly to control winning scores
+    # - Continue reducing par dominance
+    # - Maintain bogey rate for variance
+    # - Maintain double rate for downside variance
     baseline = {
-        "eagle": 0.005,    # 0.5% - increased from 0.001% to create eagle opportunities
-        "birdie": 0.135,   # 13.5% - increased from 9.1% to shift mass from par
-        "par": 0.680,      # 68.0% - reduced from 75.5% to decrease compression
-        "bogey": 0.135,    # 13.5% - increased from 11.4% to add downside variance
-        "double": 0.045,   # 4.5% - increased from 4.0% for additional variance
+        "eagle": 0.005,    # 0.5% - provides eagle opportunities
+        "birdie": 0.120,   # 12% - reduced from 13.5% to control winning scores
+        "par": 0.695,      # 69.5% - increased from 68% to balance
+        "bogey": 0.135,    # 13.5% - maintain for realistic mistakes
+        "double": 0.045,   # 4.5% - maintain for downside variance
     }
 
     # Adjust for player skill (0-100 scale, normalize to -1 to +1 range)
@@ -94,25 +94,25 @@ def simulate_hole(
     probs = baseline.copy()
 
     # Skill adjustments: better players get more birdies/eagles, fewer bogeys/doubles
-    # REBALANCED to allow more bogeys while preserving skill differentiation
+    # REBALANCED to allow more bogeys even for elite players
     if skill_factor > 0:  # Better than average
         shift = skill_factor * 0.06  # Max 6% shift for elite players
         # Eagle: allow moderate scaling now that baseline is higher
-        eagle_shift = shift * 0.15  # Increased from 0.003 to 0.15 - eagles can now scale with skill
+        eagle_shift = shift * 0.15  # eagles scale with skill
         # Birdie: main scoring improvement bucket
-        birdie_shift = shift * 0.60  # Reduced slightly from 0.655
+        birdie_shift = shift * 0.55  # Reduced from 0.60 to control winning scores
 
         probs["eagle"] += eagle_shift
         probs["birdie"] += birdie_shift
-        probs["par"] -= shift * 0.25
-        probs["bogey"] -= shift * 0.20  # REDUCED from 0.35 to 0.20 - allow more bogeys
-        probs["double"] -= shift * 0.05  # REDUCED from 0.10 to 0.05 - allow more doubles
+        probs["par"] -= shift * 0.30
+        probs["bogey"] -= shift * 0.10  # FURTHER REDUCED from 0.20 to 0.10 - preserve bogeys for elite players
+        probs["double"] -= shift * 0.05
     else:  # Worse than average
         shift = abs(skill_factor) * 0.06
-        probs["eagle"] -= shift * 0.10  # Increased from 0.001 to 0.10 - eagles reduce for weak players
-        probs["birdie"] -= shift * 0.50
+        probs["eagle"] -= shift * 0.10
+        probs["birdie"] -= shift * 0.45
         probs["par"] -= shift * 0.10
-        probs["bogey"] += shift * 0.50
+        probs["bogey"] += shift * 0.45
         probs["double"] += shift * 0.20
 
     # Difficulty adjustments: harder holes = fewer birdies, more bogeys
@@ -182,20 +182,6 @@ def simulate_hole(
     total = sum(probs.values())
     for key in probs:
         probs[key] /= total
-
-    # HARD CAP on eagle probability AFTER normalization to control rare event bucket
-    # Target overall eagle rate ~2%, so cap individual hole probabilities aggressively
-    MAX_EAGLE_PROB = 0.008  # 0.8% hard cap (very aggressive to hit ~2% tournament average)
-    orig_eagle = probs["eagle"]
-    if probs["eagle"] > MAX_EAGLE_PROB:
-        excess = probs["eagle"] - MAX_EAGLE_PROB
-        probs["eagle"] = MAX_EAGLE_PROB
-        # Redistribute excess to birdie (preserve scoring upside)
-        probs["birdie"] += excess
-        # Re-normalize after capping
-        total = sum(probs.values())
-        for key in probs:
-            probs[key] /= total
 
     # Sample from distribution
     outcomes = ["eagle", "birdie", "par", "bogey", "double"]
