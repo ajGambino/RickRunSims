@@ -94,18 +94,18 @@ def simulate_hole(
     probs = baseline.copy()
 
     # Skill adjustments: better players get more birdies/eagles, fewer bogeys/doubles
-    # REBALANCED to allow more bogeys even for elite players
+    # FINAL TUNE: reduce elite insulation, allow more realistic bogeys
     if skill_factor > 0:  # Better than average
         shift = skill_factor * 0.06  # Max 6% shift for elite players
-        # Eagle: allow moderate scaling now that baseline is higher
-        eagle_shift = shift * 0.15  # eagles scale with skill
-        # Birdie: main scoring improvement bucket
-        birdie_shift = shift * 0.55  # Reduced from 0.60 to control winning scores
+        # Eagle: maintain moderate scaling
+        eagle_shift = shift * 0.15
+        # Birdie: SLIGHTLY REDUCED to control winning scores
+        birdie_shift = shift * 0.50  # Reduced from 0.55 to 0.50
 
         probs["eagle"] += eagle_shift
         probs["birdie"] += birdie_shift
         probs["par"] -= shift * 0.30
-        probs["bogey"] -= shift * 0.10  # FURTHER REDUCED from 0.20 to 0.10 - preserve bogeys for elite players
+        probs["bogey"] -= shift * 0.05  # FURTHER REDUCED from 0.10 to 0.05 - elite players must face bogeys
         probs["double"] -= shift * 0.05
     else:  # Worse than average
         shift = abs(skill_factor) * 0.06
@@ -133,10 +133,10 @@ def simulate_hole(
         probs["double"] -= shift * 0.15
 
     # Apply player-specific trait boosts (legacy, still supported)
-    # These are already small (-0.5 to 0.5), no change needed
+    # FINAL TUNE: scale down bogey_avoid to prevent elite player insulation
     probs["birdie"] += birdie_boost
-    probs["bogey"] -= bogey_avoid
-    probs["par"] += bogey_avoid - birdie_boost  # Rebalance
+    probs["bogey"] -= bogey_avoid * 0.40  # Scale down from 1.0 to 0.40 - trait was too strong
+    probs["par"] += (bogey_avoid * 0.40) - birdie_boost  # Rebalance
 
     # Aggression: increases eagles/birdies AND bogeys/doubles (risk-reward)
     # Eagle bucket is HEAVILY CAPPED - aggression mainly affects birdie/bogey trade-off
