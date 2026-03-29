@@ -32,7 +32,9 @@ def simulate_hole(
         rng: Random number generator for reproducibility
 
     Returns:
-        Absolute score for the hole (e.g., 3, 4, 5, etc.)
+        Tuple of (absolute_score, outcome_category)
+        - absolute_score: integer stroke count (e.g., 3, 4, 5, etc.)
+        - outcome_category: "eagle", "birdie", "par", "bogey", or "double"
     """
     # Extract base player attributes
     base_skill = player_rating["skill_rating"]  # 0-100 scale
@@ -67,18 +69,18 @@ def simulate_hole(
     skill = base_skill + par_adjustment
 
     # Baseline probabilities for a neutral (skill 50) player on a neutral hole
-    # Calibrated to PGA Tour averages:
-    # - Eagles are rare (1-2%)
-    # - Birdies are good but not dominant (18-22%)
-    # - Pars are most common (55-60%)
-    # - Bogeys happen (15-20%)
-    # - Doubles+ are occasional (3-5%)
+    # Recalibrated for more realistic variance:
+    # - Increase eagles from 0.001% to provide meaningful eagle opportunities
+    # - Increase birdies to maintain scoring
+    # - Reduce par dominance to add variance
+    # - Increase bogeys to reflect realistic mistakes
+    # - Slight increase to doubles for downside variance
     baseline = {
-        "eagle": 0.00001,  # 0.001% - eagles are extremely rare (will be amplified by modifiers)
-        "birdie": 0.091,   # 9.1% - birdie rate for pros (slightly increased to preserve scoring)
-        "par": 0.75499,    # 75.499% - par is most common
-        "bogey": 0.114,    # 11.4% - bogeys happen
-        "double": 0.04,    # 4% - doubles are uncommon
+        "eagle": 0.005,    # 0.5% - increased from 0.001% to create eagle opportunities
+        "birdie": 0.135,   # 13.5% - increased from 9.1% to shift mass from par
+        "par": 0.680,      # 68.0% - reduced from 75.5% to decrease compression
+        "bogey": 0.135,    # 13.5% - increased from 11.4% to add downside variance
+        "double": 0.045,   # 4.5% - increased from 4.0% for additional variance
     }
 
     # Adjust for player skill (0-100 scale, normalize to -1 to +1 range)
@@ -241,4 +243,4 @@ def simulate_hole(
         "double": hole.par + 2,
     }
 
-    return score_map[result]
+    return (score_map[result], result)

@@ -31,11 +31,13 @@ def simulate_round(
 
     for player_rating in player_ratings:
         hole_scores = []
+        hole_outcomes = []
 
         # Simulate each hole
         for hole in course.holes:
-            score = simulate_hole(player_rating, hole, rng)
+            score, outcome = simulate_hole(player_rating, hole, rng)
             hole_scores.append(score)
+            hole_outcomes.append(outcome)
 
         # Create round result
         round_result = PlayerRoundResult(
@@ -43,6 +45,7 @@ def simulate_round(
             player_name=player_rating["player_name"],
             round_number=round_number,
             hole_scores=hole_scores,
+            hole_outcomes=hole_outcomes,
         )
 
         # Calculate score to par

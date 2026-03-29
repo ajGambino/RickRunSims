@@ -81,30 +81,25 @@ class TournamentDiagnostics:
                     # Since we don't have direct hole par here, we'll track raw outcomes
                     pass
 
-                # Track score distributions at round level
-                # Count outcomes relative to par
-                for i, hole_score in enumerate(round_result.hole_scores):
-                    # We need hole par to classify outcomes
-                    # For now, we'll use a simplified approach based on typical course
-                    # This is a limitation - ideally we'd pass hole info
-                    # For v1, let's infer from score patterns
+                # Track score distributions from categorical outcomes
+                # Use the actual sampled outcome categories from simulation
+                for outcome in round_result.hole_outcomes:
                     self.total_holes += 1
 
-                    # Rough classification (assumes par 4 baseline)
-                    # This is approximate - better would be to pass actual hole par
-                    if hole_score <= 2:
+                    # Classify based on actual simulation outcome, not inferred from absolute score
+                    if outcome == "eagle":
                         self.eagles += 1
                         self.player_hole_outcomes[player_id]["eagles"] += 1
-                    elif hole_score == 3:
+                    elif outcome == "birdie":
                         self.birdies += 1
                         self.player_hole_outcomes[player_id]["birdies"] += 1
-                    elif hole_score == 4:
+                    elif outcome == "par":
                         self.pars += 1
                         self.player_hole_outcomes[player_id]["pars"] += 1
-                    elif hole_score == 5:
+                    elif outcome == "bogey":
                         self.bogeys += 1
                         self.player_hole_outcomes[player_id]["bogeys"] += 1
-                    else:
+                    elif outcome == "double":
                         self.doubles_plus += 1
                         self.player_hole_outcomes[player_id]["doubles_plus"] += 1
 

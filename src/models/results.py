@@ -11,7 +11,8 @@ class PlayerRoundResult:
     player_id: str
     player_name: str
     round_number: int
-    hole_scores: list[int]  # Score for each hole
+    hole_scores: list[int]  # Absolute score for each hole
+    hole_outcomes: list[str] = field(default_factory=list)  # Categorical outcome for each hole (eagle/birdie/par/bogey/double)
 
     @property
     def total_score(self) -> int:
