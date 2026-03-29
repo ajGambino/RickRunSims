@@ -94,28 +94,26 @@ def simulate_hole(
     probs = baseline.copy()
 
     # Skill adjustments: better players get more birdies/eagles, fewer bogeys/doubles
-    # Eagle and birdie are now SEPARATED - they scale differently
-    # Eagle is a rare event bucket with minimal skill sensitivity
-    # Birdie is the primary scoring upside bucket
+    # REBALANCED to allow more bogeys while preserving skill differentiation
     if skill_factor > 0:  # Better than average
         shift = skill_factor * 0.06  # Max 6% shift for elite players
-        # Eagle: EXTREMELY minimal skill sensitivity (treat as rare event)
-        eagle_shift = shift * 0.003  # AGGRESSIVELY REDUCED from 0.008 to 0.003 - eagles barely scale with skill
-        # Birdie: main scoring improvement bucket (compensate for reduced eagle)
-        birdie_shift = shift * 0.655  # Slightly increased from 0.65 to maintain scoring
+        # Eagle: allow moderate scaling now that baseline is higher
+        eagle_shift = shift * 0.15  # Increased from 0.003 to 0.15 - eagles can now scale with skill
+        # Birdie: main scoring improvement bucket
+        birdie_shift = shift * 0.60  # Reduced slightly from 0.655
 
         probs["eagle"] += eagle_shift
         probs["birdie"] += birdie_shift
-        probs["par"] -= shift * 0.20
-        probs["bogey"] -= shift * 0.35
-        probs["double"] -= shift * 0.10
+        probs["par"] -= shift * 0.25
+        probs["bogey"] -= shift * 0.20  # REDUCED from 0.35 to 0.20 - allow more bogeys
+        probs["double"] -= shift * 0.05  # REDUCED from 0.10 to 0.05 - allow more doubles
     else:  # Worse than average
         shift = abs(skill_factor) * 0.06
-        probs["eagle"] -= shift * 0.001  # AGGRESSIVELY REDUCED from 0.003 to 0.001
-        probs["birdie"] -= shift * 0.522
-        probs["par"] -= shift * 0.08
-        probs["bogey"] += shift * 0.45
-        probs["double"] += shift * 0.15
+        probs["eagle"] -= shift * 0.10  # Increased from 0.001 to 0.10 - eagles reduce for weak players
+        probs["birdie"] -= shift * 0.50
+        probs["par"] -= shift * 0.10
+        probs["bogey"] += shift * 0.50
+        probs["double"] += shift * 0.20
 
     # Difficulty adjustments: harder holes = fewer birdies, more bogeys
     # Eagle sensitivity is MINIMAL - eagles are rare events on any difficulty
