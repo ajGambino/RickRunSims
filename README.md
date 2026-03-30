@@ -75,15 +75,80 @@ This allows the engine to be extended to:
 
 ---
 
+## Project Status
+
+**Current Version: v1 (Calibrated)**
+
+The v1 tournament simulation and scoring model are now calibrated and producing realistic results. The focus has shifted to usability, analysis, and presentation.
+
+**Recent Improvements (v1.1):**
+- Added large demo field CSV with 90 players
+- Added analysis utilities module for inspecting results
+- Enhanced CSV export capabilities
+- Improved documentation and workflow examples
+
+---
+
 ## Future Development
 
 Planned enhancements include:
 
-- Improved hole and shot level modeling
-- Course specific calibration
+**Data & Realism:**
 - Weather and condition adjustments
-- Player correlation and volatility modeling
+- Course-specific calibration for different tournaments
+- Historical baseline comparisons
+
+**Modeling:**
+- Player correlation and interaction effects
+- Enhanced volatility modeling (hot streaks, momentum)
+- Shot-level modeling for more granular simulation
 - Integration of machine learning based probability models
+
+**Analysis & Output:**
+- Interactive visualization tools
+- Head-to-head matchup analysis
+- Scenario analysis (what-if player conditions)
+- Portfolio optimization for betting/DFS applications
+
+**Infrastructure:**
+- Web API for simulation service
+- Batch processing for large experiments
+- Performance optimizations for faster simulation
+
+---
+
+## Output Files
+
+When you export results, the following CSV files are created:
+
+### summary.csv
+Player-level aggregate statistics across all simulations:
+- `player_id`, `player_name`: Player identifiers
+- `win_pct`, `top5_pct`, `top10_pct`: Finish position probabilities
+- `make_cut_pct`: Probability of making the cut
+- `avg_finish`: Average finish position
+- `avg_score`: Average score to par
+- `num_sims`: Number of simulations
+
+**Use case:** Identifying favorites, longshots, and value plays
+
+### leaderboard.csv
+Single representative tournament results:
+- `position`: Final finish position
+- `player_id`, `player_name`: Player identifiers
+- `total_score`, `score_to_par`: Final scores
+- `made_cut`: Whether player made the cut
+- `round1`, `round2`, `round3`, `round4`: Round-by-round scores to par
+
+**Use case:** Understanding what a typical tournament outcome looks like
+
+### diagnostics.csv
+Simulation calibration and validation metrics:
+- Tournament metrics: Winning score, cut line, field average
+- Score distribution: Eagle, birdie, par, bogey, double+ rates
+- Per-player statistics (for top players)
+
+**Use case:** Validating that simulation produces realistic golf outcomes
 
 ---
 
@@ -97,6 +162,16 @@ Planned enhancements include:
 ---
 
 ## Quick Start
+
+### Installation
+
+```bash
+# Clone or download the repository
+cd RickRunSims
+
+# No external dependencies required - uses Python standard library only
+python run.py --help
+```
 
 ### Running with Built-in Demo Data
 
@@ -114,8 +189,14 @@ python run.py --tournament masters_2026 --sims 1000 --top 10
 ### Running with Custom CSV Data
 
 ```bash
-# Use a custom player CSV file
+# Use small demo field (8 players)
 python run.py --tournament masters_2026 --sims 1000 --player-csv data/demo/players/small_field_demo.csv
+
+# Use medium demo field (16 players)
+python run.py --tournament masters_2026 --sims 1000 --player-csv data/demo/players/masters_2026_demo.csv
+
+# Use large demo field (90 players - realistic Masters field size)
+python run.py --tournament masters_2026 --sims 1000 --player-csv data/demo/players/large_field_demo.csv
 
 # Or use your own CSV file
 python run.py --tournament masters_2026 --sims 1000 --player-csv path/to/your/players.csv
@@ -223,6 +304,64 @@ These metrics help answer questions like:
 - Is the cut line reasonable?
 - Are birdie/bogey rates in line with professional golf?
 - Are players too consistent or too volatile?
+
+### Analyzing Results
+
+After running simulations and exporting results, use the analysis utilities to inspect distributions and outcomes:
+
+```bash
+# Quick summary of simulation results
+python -m src.analysis.analyze outputs/summary.csv --command summary
+
+# Analyze top winners
+python -m src.analysis.analyze outputs/summary.csv --command winners --top 10
+
+# Analyze cut-making probabilities
+python -m src.analysis.analyze outputs/summary.csv --command cuts --threshold 50
+
+# Analyze score distributions
+python -m src.analysis.analyze outputs/summary.csv --command scores
+
+# Analyze finish position distributions
+python -m src.analysis.analyze outputs/summary.csv --command finishes
+
+# Compare specific players
+python -m src.analysis.analyze outputs/summary.csv --command compare --players P001 P002 P003
+```
+
+**Available analysis commands:**
+- `summary`: Quick overview of simulation results
+- `winners`: Top winning probabilities
+- `cuts`: Cut-making likelihood analysis
+- `scores`: Field score distribution statistics
+- `finishes`: Finish position distribution
+- `compare`: Side-by-side player comparison
+
+---
+
+## Complete Workflow Example
+
+Here's a complete example from simulation to analysis:
+
+```bash
+# 1. Run simulation with large field and export results
+python run.py --tournament masters_2026 --sims 5000 --seed 42 \
+  --player-csv data/demo/players/large_field_demo.csv \
+  --export-summary outputs/summary.csv \
+  --export-leaderboard outputs/leaderboard.csv \
+  --export-diagnostics outputs/diagnostics.csv \
+  --diagnostics
+
+# 2. Analyze the results
+python -m src.analysis.analyze outputs/summary.csv --command summary
+python -m src.analysis.analyze outputs/summary.csv --command winners --top 15
+python -m src.analysis.analyze outputs/summary.csv --command cuts --threshold 75
+
+# 3. Inspect the CSV files in your favorite spreadsheet tool
+# - outputs/summary.csv: Player-level aggregate statistics
+# - outputs/leaderboard.csv: Sample tournament leaderboard
+# - outputs/diagnostics.csv: Scoring distribution and calibration metrics
+```
 
 ---
 
