@@ -268,23 +268,16 @@ def export_finish_distribution_csv(
             "num_sims",
         ])
 
-        # Calculate additional stats if available from raw results
-        # For now, use the existing summary format
-        # This can be enhanced if per-sim data is retained
+        # Write data rows with real tracked statistics
         for row in summary:
-            # Estimate top3 and top20 based on existing data
-            # (This is approximate - true values would require per-sim tracking)
-            top3_pct = row.win_pct * 1.5  # Rough estimate
-            top20_pct = row.top10_pct * 1.3  # Rough estimate
-
             writer.writerow([
                 row.player_id,
                 row.player_name,
                 f"{row.win_pct:.2f}",
-                f"{top3_pct:.2f}",
+                f"{row.top3_pct:.2f}",
                 f"{row.top5_pct:.2f}",
                 f"{row.top10_pct:.2f}",
-                f"{top20_pct:.2f}",
+                f"{row.top20_pct:.2f}",
                 f"{row.make_cut_pct:.2f}",
                 f"{row.avg_finish:.2f}",
                 f"{row.avg_score:.2f}",

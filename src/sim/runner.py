@@ -16,7 +16,8 @@ def run_monte_carlo(
     num_sims: int,
     seed: Optional[int] = None,
     collect_diagnostics: bool = False,
-) -> Tuple[List[SimulationSummaryRow], Optional[TournamentDiagnostics]]:
+    retain_sim_results: bool = False,
+) -> Tuple[List[SimulationSummaryRow], Optional[TournamentDiagnostics], Optional[List[TournamentSimResult]]]:
     """
     Run Monte Carlo simulation of tournament.
 
@@ -26,11 +27,13 @@ def run_monte_carlo(
         num_sims: Number of simulations to run
         seed: Random seed for reproducibility (optional)
         collect_diagnostics: Whether to collect detailed diagnostics (optional)
+        retain_sim_results: Whether to retain individual simulation results (optional)
 
     Returns:
-        Tuple of (summary_rows, diagnostics)
+        Tuple of (summary_rows, diagnostics, sim_results)
         - summary_rows: List of SimulationSummaryRow objects
         - diagnostics: TournamentDiagnostics object if collect_diagnostics=True, else None
+        - sim_results: List of TournamentSimResult objects if retain_sim_results=True, else None
     """
     # Initialize RNG
     base_rng = random.Random(seed)
@@ -38,8 +41,10 @@ def run_monte_carlo(
     # Track stats across all sims
     player_stats = defaultdict(lambda: {
         "wins": 0,
+        "top3": 0,
         "top5": 0,
         "top10": 0,
+        "top20": 0,
         "made_cut": 0,
         "total_finish": 0,
         "total_score": 0,
@@ -51,6 +56,9 @@ def run_monte_carlo(
     diagnostics = TournamentDiagnostics() if collect_diagnostics else None
     course_par = config.course.total_par
 
+    # Optionally retain individual sim results
+    sim_results = [] if retain_sim_results else None
+
     # Run simulations
     for sim_num in range(num_sims):
         # Create a new RNG for this simulation (for reproducibility)
@@ -59,6 +67,10 @@ def run_monte_carlo(
 
         # Run tournament
         result = simulate_tournament(player_ratings, config, sim_rng)
+
+        # Retain result if requested
+        if retain_sim_results:
+            sim_results.append(result)
 
         # Collect diagnostics if requested
         if diagnostics:
@@ -80,10 +92,14 @@ def run_monte_carlo(
 
             if player_result.finish_position == 1:
                 stats["wins"] += 1
+            if player_result.finish_position <= 3:
+                stats["top3"] += 1
             if player_result.finish_position <= 5:
                 stats["top5"] += 1
             if player_result.finish_position <= 10:
                 stats["top10"] += 1
+            if player_result.finish_position <= 20:
+                stats["top20"] += 1
             if player_result.made_cut:
                 stats["made_cut"] += 1
 
@@ -96,8 +112,10 @@ def run_monte_carlo(
             player_id=player_id,
             player_name=stats["player_name"],
             win_pct=stats["wins"] / n_sims * 100,
+            top3_pct=stats["top3"] / n_sims * 100,
             top5_pct=stats["top5"] / n_sims * 100,
             top10_pct=stats["top10"] / n_sims * 100,
+            top20_pct=stats["top20"] / n_sims * 100,
             make_cut_pct=stats["made_cut"] / n_sims * 100,
             avg_finish=stats["total_finish"] / n_sims,
             avg_score=stats["total_score"] / n_sims,
@@ -122,4 +140,4 @@ def run_monte_carlo(
         print(f"Total eagles sampled: {simulate_hole.eagle_outcome_count:,}")
         print(f"{'='*80}\n")
 
-    return summary_rows, diagnostics
+    return summary_rows, diagnostics, sim_results

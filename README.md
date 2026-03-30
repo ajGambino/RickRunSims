@@ -150,6 +150,28 @@ Simulation calibration and validation metrics:
 
 **Use case:** Validating that simulation produces realistic golf outcomes
 
+### finish_distribution.csv
+Enhanced player-level summary with additional finish position breakdowns:
+- `player_id`, `player_name`: Player identifiers
+- `win_pct`, `top3_pct`, `top5_pct`, `top10_pct`, `top20_pct`: Finish position probabilities
+- `make_cut_pct`: Probability of making the cut
+- `avg_finish`: Average finish position
+- `avg_score`: Average score to par
+- `num_sims`: Number of simulations
+
+**Use case:** More granular analysis of finish probabilities for betting or DFS
+
+### sim_results.csv
+Individual simulation results (top finishers per simulation):
+- `sim_number`: Simulation identifier (1, 2, 3, ...)
+- `player_id`, `player_name`: Player identifiers
+- `finish_position`: Position in this specific simulation
+- `total_score`, `score_to_par`: Final scores
+- `made_cut`: Whether player made the cut
+- `is_winner`: Whether player won this simulation
+
+**Use case:** Analyzing variance, correlations, and simulation-by-simulation outcomes
+
 ---
 
 ## Example Output
@@ -210,6 +232,9 @@ python run.py --tournament masters_2026 --sims 1000 --player-csv path/to/your/pl
 - `--player-csv`: Path to CSV file with player data (optional, uses built-in demo data if not specified)
 - `--export-summary`: Export Monte Carlo summary to CSV file (optional)
 - `--export-leaderboard`: Export a representative tournament leaderboard to CSV file (optional)
+- `--export-finish-distribution`: Export finish distribution summary with top3/top20 stats to CSV file (optional)
+- `--export-sim-results`: Export individual simulation results to CSV file (optional)
+- `--sim-results-top`: Number of top finishers per simulation to export (default: 30, only used with --export-sim-results)
 - `--diagnostics`: Collect and display simulation diagnostics (optional)
 - `--export-diagnostics`: Export diagnostics to CSV file (optional)
 
@@ -255,13 +280,25 @@ python run.py --tournament masters_2026 --sims 1000 --export-summary outputs/sum
 # Export a representative tournament leaderboard
 python run.py --tournament masters_2026 --sims 1000 --export-leaderboard outputs/leaderboard.csv
 
-# Export both
-python run.py --tournament masters_2026 --sims 5000 --seed 42 --export-summary outputs/summary.csv --export-leaderboard outputs/leaderboard.csv
+# Export enhanced finish distribution with top3/top20 breakdowns
+python run.py --tournament masters_2026 --sims 1000 --export-finish-distribution outputs/finish_dist.csv
+
+# Export individual simulation results (for variance/correlation analysis)
+python run.py --tournament masters_2026 --sims 1000 --export-sim-results outputs/sim_results.csv
+
+# Export all formats
+python run.py --tournament masters_2026 --sims 5000 --seed 42 \
+  --export-summary outputs/summary.csv \
+  --export-leaderboard outputs/leaderboard.csv \
+  --export-finish-distribution outputs/finish_dist.csv \
+  --export-sim-results outputs/sim_results.csv
 ```
 
 **Export formats:**
 - **Summary CSV**: Player-level aggregate statistics across all simulations (win %, top 5%, top 10%, make cut %, avg finish, avg score)
 - **Leaderboard CSV**: Single representative tournament results showing final standings, round-by-round scores, and cut status
+- **Finish Distribution CSV**: Enhanced summary with top3 and top20 finish probabilities (useful for betting/DFS)
+- **Sim Results CSV**: Individual simulation results showing top finishers per simulation (useful for variance analysis)
 
 ### Simulation Diagnostics
 
@@ -344,11 +381,13 @@ python -m src.analysis.analyze outputs/summary.csv --command compare --players P
 Here's a complete example from simulation to analysis:
 
 ```bash
-# 1. Run simulation with large field and export results
+# 1. Run simulation with large field and export all result formats
 python run.py --tournament masters_2026 --sims 5000 --seed 42 \
   --player-csv data/demo/players/large_field_demo.csv \
   --export-summary outputs/summary.csv \
   --export-leaderboard outputs/leaderboard.csv \
+  --export-finish-distribution outputs/finish_dist.csv \
+  --export-sim-results outputs/sim_results.csv \
   --export-diagnostics outputs/diagnostics.csv \
   --diagnostics
 
@@ -360,6 +399,8 @@ python -m src.analysis.analyze outputs/summary.csv --command cuts --threshold 75
 # 3. Inspect the CSV files in your favorite spreadsheet tool
 # - outputs/summary.csv: Player-level aggregate statistics
 # - outputs/leaderboard.csv: Sample tournament leaderboard
+# - outputs/finish_dist.csv: Enhanced summary with top3/top20 probabilities
+# - outputs/sim_results.csv: Individual simulation outcomes (top 30 per sim)
 # - outputs/diagnostics.csv: Scoring distribution and calibration metrics
 ```
 

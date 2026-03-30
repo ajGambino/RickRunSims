@@ -10,7 +10,7 @@ from src.features.rating_builder import build_player_rating
 from src.sim.runner import run_monte_carlo
 from src.sim.tournament_engine import simulate_tournament
 from src.outputs.reports import print_simulation_summary, print_quick_summary
-from src.outputs.export_csv import export_summary_csv, export_leaderboard_csv, export_diagnostics_csv
+from src.outputs.export_csv import export_summary_csv, export_leaderboard_csv, export_diagnostics_csv, export_sim_results_csv, export_finish_distribution_csv
 from src.outputs.diagnostics_report import print_diagnostics_summary, print_top_players_diagnostics
 
 
@@ -72,6 +72,24 @@ def main():
         default=None,
         help="Export diagnostics to CSV file (optional)",
     )
+    parser.add_argument(
+        "--export-sim-results",
+        type=str,
+        default=None,
+        help="Export individual simulation results to CSV file (optional)",
+    )
+    parser.add_argument(
+        "--export-finish-distribution",
+        type=str,
+        default=None,
+        help="Export finish distribution summary with top3/top20 stats to CSV file (optional)",
+    )
+    parser.add_argument(
+        "--sim-results-top",
+        type=int,
+        default=30,
+        help="Number of top finishers per simulation to export (default: 30, only used with --export-sim-results)",
+    )
 
     args = parser.parse_args()
 
@@ -109,12 +127,14 @@ def main():
 
     try:
         collect_diag = args.diagnostics or args.export_diagnostics is not None
-        summary, diagnostics = run_monte_carlo(
+        retain_sims = args.export_sim_results is not None
+        summary, diagnostics, sim_results = run_monte_carlo(
             player_ratings=player_ratings,
             config=config,
             num_sims=args.sims,
             seed=args.seed,
             collect_diagnostics=collect_diag,
+            retain_sim_results=retain_sims,
         )
     except Exception as e:
         print(f" Error running simulations: {e}")
@@ -167,6 +187,24 @@ def main():
             except Exception as e:
                 print(f"\nError exporting diagnostics: {e}")
                 return 1
+
+    # Export sim results if requested
+    if args.export_sim_results:
+        try:
+            export_sim_results_csv(sim_results, args.export_sim_results, top_n=args.sim_results_top)
+            exports_written.append(f"Sim Results: {args.export_sim_results}")
+        except Exception as e:
+            print(f"\n✗ Error exporting sim results: {e}")
+            return 1
+
+    # Export finish distribution if requested
+    if args.export_finish_distribution:
+        try:
+            export_finish_distribution_csv(summary, args.export_finish_distribution)
+            exports_written.append(f"Finish Distribution: {args.export_finish_distribution}")
+        except Exception as e:
+            print(f"\n✗ Error exporting finish distribution: {e}")
+            return 1
 
     if exports_written:
         print(f"\nExports written:")

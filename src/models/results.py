@@ -50,8 +50,10 @@ class SimulationSummaryRow:
     player_id: str
     player_name: str
     win_pct: float = 0.0
+    top3_pct: float = 0.0
     top5_pct: float = 0.0
     top10_pct: float = 0.0
+    top20_pct: float = 0.0
     make_cut_pct: float = 0.0
     avg_finish: float = 0.0
     avg_score: float = 0.0
