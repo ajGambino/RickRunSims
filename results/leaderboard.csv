@@ -1,0 +1,9 @@
+position,player_id,player_name,total_score,score_to_par,made_cut,round1,round2,round3,round4
+1,P001,Elite Player,273,-15,Y,-7,-5,-7,4
+2,P006,Rising Star,286,-2,Y,1,1,0,-4
+3,P002,Strong Contender,287,-1,Y,0,-3,4,-2
+4,P003,Consistent Pro,288,0,Y,-2,1,1,0
+4,P005,Steady Eddie,288,0,Y,3,1,-2,-2
+6,P008,Long Shot,290,2,Y,1,1,-6,6
+7,P004,Volatile Talent,292,4,Y,-2,8,4,-6
+8,P007,Journey Player,295,7,Y,1,5,-1,2

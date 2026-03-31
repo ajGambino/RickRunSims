@@ -4,7 +4,7 @@ Validates required fields and types, converts to PlayerProfile objects.
 """
 import csv
 from pathlib import Path
-from typing import List
+from typing import List, Sequence
 from src.data.schemas import PlayerProfile
 
 
@@ -98,7 +98,7 @@ def load_players_from_csv(csv_path: str) -> List[PlayerProfile]:
     return players
 
 
-def _validate_columns(fieldnames: List[str]) -> None:
+def _validate_columns(fieldnames: Sequence[str]) -> None:
     """Validate that required columns are present."""
     missing = set(REQUIRED_COLUMNS) - set(fieldnames)
     if missing:

@@ -12,6 +12,7 @@ from src.sim.tournament_engine import simulate_tournament
 from src.outputs.reports import print_simulation_summary, print_quick_summary
 from src.outputs.export_csv import export_summary_csv, export_leaderboard_csv, export_diagnostics_csv, export_sim_results_csv, export_finish_distribution_csv
 from src.outputs.diagnostics_report import print_diagnostics_summary, print_top_players_diagnostics
+from src.analysis.validation import validate_simulation, print_validation_report, export_validation_report
 
 
 def main():
@@ -47,7 +48,19 @@ def main():
         "--player-csv",
         type=str,
         default=None,
-        help="Path to CSV file with player data (optional, uses demo data if not specified)",
+        help="Path to sim-ready CSV file with player data (optional, uses demo data if not specified)",
+    )
+    parser.add_argument(
+        "--raw-player-csv",
+        type=str,
+        default=None,
+        help="Path to raw player statistics CSV (private data pipeline, optional)",
+    )
+    parser.add_argument(
+        "--raw-round-csv",
+        type=str,
+        default=None,
+        help="Path to raw round-by-round CSV for volatility calculation (used with --raw-player-csv, optional)",
     )
     parser.add_argument(
         "--export-summary",
@@ -90,6 +103,23 @@ def main():
         default=30,
         help="Number of top finishers per simulation to export (default: 30, only used with --export-sim-results)",
     )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run validation against benchmark targets (requires --diagnostics)",
+    )
+    parser.add_argument(
+        "--validation-config",
+        type=str,
+        default="masters_baseline",
+        help="Validation benchmark configuration to use (default: masters_baseline)",
+    )
+    parser.add_argument(
+        "--export-validation",
+        type=str,
+        default=None,
+        help="Export validation report to directory (optional, requires --validate)",
+    )
 
     args = parser.parse_args()
 
@@ -100,13 +130,22 @@ def main():
 
     # Load tournament data
     print(f"\nLoading tournament: {args.tournament}...")
-    if args.player_csv:
-        print(f"Data source: Custom CSV ({args.player_csv})")
+    if args.raw_player_csv:
+        print(f"Data source: Raw player statistics ({args.raw_player_csv})")
+        if args.raw_round_csv:
+            print(f"             + Round data ({args.raw_round_csv})")
+    elif args.player_csv:
+        print(f"Data source: Sim-ready CSV ({args.player_csv})")
     else:
         print("Data source: Built-in demo data")
 
     try:
-        player_field, config = load_tournament_data(args.tournament, player_csv=args.player_csv)
+        player_field, config = load_tournament_data(
+            args.tournament,
+            player_csv=args.player_csv,
+            raw_player_csv=args.raw_player_csv,
+            raw_round_csv=args.raw_round_csv,
+        )
         print(f" Loaded {len(player_field)} players")
         print(f" Course: {config.course.name} (Par {config.course.total_par})")
         print(f" Format: {config.num_rounds} rounds")
@@ -126,7 +165,7 @@ def main():
     start_time = time.time()
 
     try:
-        collect_diag = args.diagnostics or args.export_diagnostics is not None
+        collect_diag = args.diagnostics or args.export_diagnostics is not None or args.validate
         retain_sims = args.export_sim_results is not None
         summary, diagnostics, sim_results = run_monte_carlo(
             player_ratings=player_ratings,
@@ -186,6 +225,42 @@ def main():
                 exports_written.append(f"Diagnostics: {args.export_diagnostics}")
             except Exception as e:
                 print(f"\nError exporting diagnostics: {e}")
+                return 1
+
+        # Run validation if requested
+        if args.validate:
+            try:
+                # Load benchmark configuration
+                if args.validation_config == "masters_baseline":
+                    from src.config.validation.masters_baseline import get_benchmark_config
+                    benchmark_config = get_benchmark_config()
+                    benchmark_name = "Masters Baseline"
+                else:
+                    print(f"\n✗ Error: Unknown validation config: {args.validation_config}")
+                    return 1
+
+                # Run validation
+                validation_report = validate_simulation(
+                    diagnostics=diagnostics,
+                    summary=summary,
+                    benchmark_config=benchmark_config,
+                    num_sims=args.sims,
+                    tournament_name=config.name,
+                    benchmark_name=benchmark_name
+                )
+
+                # Print validation report
+                print_validation_report(validation_report)
+
+                # Export validation report if requested
+                if args.export_validation:
+                    export_validation_report(validation_report, args.export_validation)
+                    exports_written.append(f"Validation: {args.export_validation}/")
+
+            except Exception as e:
+                print(f"\n✗ Error running validation: {e}")
+                import traceback
+                traceback.print_exc()
                 return 1
 
     # Export sim results if requested

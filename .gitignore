@@ -6,8 +6,8 @@ venv/
 .env
 
 # Data
-data/raw/*
-data/processed/*
+data/private/raw/*
+data/private/processed/*
 outputs/*
 !data/sample/
 !data/sample/**
@@ -26,3 +26,5 @@ secrets.json
 # notes
 notes/*.txt
 .claude/settings.local.json
+
+

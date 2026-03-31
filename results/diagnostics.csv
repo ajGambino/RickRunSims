@@ -1,0 +1,20 @@
+Metric,Value
+num_simulations,100
+
+Tournament Metrics,
+avg_winning_score,-13.50
+std_winning_score,4.11
+min_winning_score,-23
+max_winning_score,-5
+avg_cut_line,7.41
+std_cut_line,4.57
+avg_field_score,-2.65
+std_field_score,2.25
+
+Score Distribution,
+total_holes,57600
+eagle_rate_pct,1.07
+birdie_rate_pct,22.39
+par_rate_pct,60.88
+bogey_rate_pct,10.47
+double_plus_rate_pct,5.19

@@ -82,6 +82,7 @@ This allows the engine to be extended to:
 The v1 tournament simulation and scoring model are now calibrated and producing realistic results. The focus has shifted to usability, analysis, and presentation.
 
 **Recent Improvements (v1.1):**
+
 - Added large demo field CSV with 90 players
 - Added analysis utilities module for inspecting results
 - Enhanced CSV export capabilities
@@ -94,23 +95,27 @@ The v1 tournament simulation and scoring model are now calibrated and producing 
 Planned enhancements include:
 
 **Data & Realism:**
+
 - Weather and condition adjustments
 - Course-specific calibration for different tournaments
 - Historical baseline comparisons
 
 **Modeling:**
+
 - Player correlation and interaction effects
 - Enhanced volatility modeling (hot streaks, momentum)
 - Shot-level modeling for more granular simulation
 - Integration of machine learning based probability models
 
 **Analysis & Output:**
+
 - Interactive visualization tools
 - Head-to-head matchup analysis
 - Scenario analysis (what-if player conditions)
 - Portfolio optimization for betting/DFS applications
 
 **Infrastructure:**
+
 - Web API for simulation service
 - Batch processing for large experiments
 - Performance optimizations for faster simulation
@@ -122,7 +127,9 @@ Planned enhancements include:
 When you export results, the following CSV files are created:
 
 ### summary.csv
+
 Player-level aggregate statistics across all simulations:
+
 - `player_id`, `player_name`: Player identifiers
 - `win_pct`, `top5_pct`, `top10_pct`: Finish position probabilities
 - `make_cut_pct`: Probability of making the cut
@@ -133,7 +140,9 @@ Player-level aggregate statistics across all simulations:
 **Use case:** Identifying favorites, longshots, and value plays
 
 ### leaderboard.csv
+
 Single representative tournament results:
+
 - `position`: Final finish position
 - `player_id`, `player_name`: Player identifiers
 - `total_score`, `score_to_par`: Final scores
@@ -143,7 +152,9 @@ Single representative tournament results:
 **Use case:** Understanding what a typical tournament outcome looks like
 
 ### diagnostics.csv
+
 Simulation calibration and validation metrics:
+
 - Tournament metrics: Winning score, cut line, field average
 - Score distribution: Eagle, birdie, par, bogey, double+ rates
 - Per-player statistics (for top players)
@@ -151,7 +162,9 @@ Simulation calibration and validation metrics:
 **Use case:** Validating that simulation produces realistic golf outcomes
 
 ### finish_distribution.csv
+
 Enhanced player-level summary with additional finish position breakdowns:
+
 - `player_id`, `player_name`: Player identifiers
 - `win_pct`, `top3_pct`, `top5_pct`, `top10_pct`, `top20_pct`: Finish position probabilities
 - `make_cut_pct`: Probability of making the cut
@@ -162,7 +175,9 @@ Enhanced player-level summary with additional finish position breakdowns:
 **Use case:** More granular analysis of finish probabilities for betting or DFS
 
 ### sim_results.csv
+
 Individual simulation results (top finishers per simulation):
+
 - `sim_number`: Simulation identifier (1, 2, 3, ...)
 - `player_id`, `player_name`: Player identifiers
 - `finish_position`: Position in this specific simulation
@@ -208,7 +223,7 @@ python run.py --tournament masters_2026 --sims 5000 --seed 42
 python run.py --tournament masters_2026 --sims 1000 --top 10
 ```
 
-### Running with Custom CSV Data
+### Running with Sim-Ready CSV Data
 
 ```bash
 # Use small demo field (8 players)
@@ -220,16 +235,63 @@ python run.py --tournament masters_2026 --sims 1000 --player-csv data/demo/playe
 # Use large demo field (90 players - realistic Masters field size)
 python run.py --tournament masters_2026 --sims 1000 --player-csv data/demo/players/large_field_demo.csv
 
-# Or use your own CSV file
+# Or use your own sim-ready CSV file
 python run.py --tournament masters_2026 --sims 1000 --player-csv path/to/your/players.csv
 ```
 
+### Running with Raw Golf Statistics (Private Data Pipeline)
+
+If you have access to raw PGA Tour statistics (strokes gained, scoring, etc.), you can use the private data pipeline to automatically transform them into simulation-ready features:
+
+```bash
+# Use raw player statistics CSV
+python run.py --tournament masters_2026 --sims 1000 \
+  --raw-player-csv data/private/raw/comprehensive_stats.csv
+
+# Include round-by-round data for better volatility calculation
+python run.py --tournament masters_2026 --sims 1000 \
+  --raw-player-csv data/private/raw/comprehensive_stats.csv \
+  --raw-round-csv data/private/raw/round_performance.csv
+```
+
+**Raw Data Pipeline Features:**
+
+- Automatically derives skill_rating from strokes gained (sg_tot, w_sg_tot)
+- Computes par-specific skills from sg_par_3, sg_par_4, sg_par_5
+- Derives birdie_boost from scoring ability (bob/bobg, sg_app, sg_putt)
+- Derives bogey_avoidance from defensive stats (bogey_avoid, scrambling)
+- Calculates volatility from round-level variance (when round data provided)
+- Applies sample-size shrinkage for players with limited data
+- Includes recent-form adjustments from L12/L24 metrics
+
+**Required columns in raw player CSV:**
+
+- `player_id`, `name`, `sg_tot`
+
+**Recommended columns:**
+
+- `w_sg_tot`, `sg_ott`, `sg_app`, `sg_arg`, `sg_putt`
+- `sg_par_3`, `sg_par_4`, `sg_par_5`
+- `bob`, `bobg`, `bogey_avoid`, `scrambling`
+- `gir`, `driving_distance_avg`, `driving_accuracy`
+- `rounds`, `sg_rounds`
+- `sg_app_l_12`, `sg_ott_l_12`, `sg_putt_l_12` (recent form)
+
+**Round performance CSV columns:**
+
+- `Player`, `TOT` (for volatility calculation)
+
+See [src/data/adapters/private_adapter.py](src/data/adapters/private_adapter.py) for detailed transformation formulas.
+
 **Command line options:**
+
 - `--tournament`: Tournament to simulate (default: `masters_2026`)
 - `--sims`: Number of Monte Carlo simulations (default: 1000)
 - `--seed`: Random seed for reproducibility (optional)
 - `--top`: Number of top players to display in results (default: 20)
-- `--player-csv`: Path to CSV file with player data (optional, uses built-in demo data if not specified)
+- `--player-csv`: Path to sim-ready CSV file with player data (optional, uses demo data if not specified)
+- `--raw-player-csv`: Path to raw player statistics CSV (private data pipeline, optional)
+- `--raw-round-csv`: Path to raw round-by-round CSV for volatility (used with --raw-player-csv, optional)
 - `--export-summary`: Export Monte Carlo summary to CSV file (optional)
 - `--export-leaderboard`: Export a representative tournament leaderboard to CSV file (optional)
 - `--export-finish-distribution`: Export finish distribution summary with top3/top20 stats to CSV file (optional)
@@ -238,30 +300,35 @@ python run.py --tournament masters_2026 --sims 1000 --player-csv path/to/your/pl
 - `--diagnostics`: Collect and display simulation diagnostics (optional)
 - `--export-diagnostics`: Export diagnostics to CSV file (optional)
 
-### CSV File Format
+### Sim-Ready CSV File Format
 
-Player CSV files must include these columns:
+Sim-ready player CSV files must include these columns:
 
 **Required columns:**
+
 - `player_id`: Unique identifier (string)
 - `name`: Player name (string)
 - `skill_rating`: Player skill level, 0-100 scale where higher = better (numeric)
 - `volatility`: Variance in performance, 0-1 scale where higher = more variance (numeric)
 
 **Optional columns (legacy, still supported):**
+
 - `birdie_boost`: Modifier for birdie probability, -0.5 to 0.5 (numeric, default: 0.0)
 - `bogey_avoidance`: Modifier for bogey avoidance, -0.5 to 0.5 (numeric, default: 0.0)
 
 **Optional columns (par-specific skills):**
+
 - `par3_skill`: Skill adjustment for par 3 holes, -15 to 15 (numeric, default: 0.0)
 - `par4_skill`: Skill adjustment for par 4 holes, -15 to 15 (numeric, default: 0.0)
 - `par5_skill`: Skill adjustment for par 5 holes, -15 to 15 (numeric, default: 0.0)
 
 **Optional columns (play-style traits):**
+
 - `consistency`: Pulls outcomes toward par, 0-1 scale (numeric, default: 0.0)
 - `aggression`: Increases eagles/birdies AND bogeys/doubles, 0-1 scale (numeric, default: 0.0)
 
 **Example CSV:**
+
 ```csv
 player_id,name,skill_rating,volatility,birdie_boost,bogey_avoidance,par3_skill,par4_skill,par5_skill,consistency,aggression
 P001,Elite Player,95,0.25,0.12,0.15,2,1,2,0.20,0.30
@@ -295,6 +362,7 @@ python run.py --tournament masters_2026 --sims 5000 --seed 42 \
 ```
 
 **Export formats:**
+
 - **Summary CSV**: Player-level aggregate statistics across all simulations (win %, top 5%, top 10%, make cut %, avg finish, avg score)
 - **Leaderboard CSV**: Single representative tournament results showing final standings, round-by-round scores, and cut status
 - **Finish Distribution CSV**: Enhanced summary with top3 and top20 finish probabilities (useful for betting/DFS)
@@ -317,26 +385,30 @@ python run.py --tournament masters_2026 --sims 5000 --seed 42 --diagnostics --ex
 
 **Diagnostic metrics tracked:**
 
-*Tournament-level:*
+_Tournament-level:_
+
 - Average winning score (to par)
 - Winning score distribution (min, max, std dev)
 - Average cut line (to par)
 - Cut line distribution
 - Field average score
 
-*Score distribution (all players, all holes):*
+_Score distribution (all players, all holes):_
+
 - Eagle rate %
 - Birdie rate %
 - Par rate %
 - Bogey rate %
 - Double+ rate %
 
-*Player-level (top N players):*
+_Player-level (top N players):_
+
 - Average round score to par
 - Score standard deviation
 - Individual scoring distribution rates
 
 These metrics help answer questions like:
+
 - Are winning scores realistic for the course?
 - Is the cut line reasonable?
 - Are birdie/bogey rates in line with professional golf?
@@ -367,6 +439,7 @@ python -m src.analysis.analyze outputs/summary.csv --command compare --players P
 ```
 
 **Available analysis commands:**
+
 - `summary`: Quick overview of simulation results
 - `winners`: Top winning probabilities
 - `cuts`: Cut-making likelihood analysis
