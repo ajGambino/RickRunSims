@@ -5,7 +5,7 @@ from typing import Tuple, Optional, List
 from src.data.schemas import PlayerProfile, TournamentConfig
 from src.data.adapters.demo_adapter import load_demo_field
 from src.data.adapters.csv_adapter import load_players_from_csv
-from data.adapters.private_adapter import load_players_from_raw
+from src.data.adapters.private_adapter import load_players_from_raw
 from src.config.tournaments.masters_2026 import get_masters_2026_config
 
 

@@ -8,6 +8,7 @@ from src.data.schemas import TournamentConfig
 from src.models.results import SimulationSummaryRow, TournamentSimResult
 from src.sim.tournament_engine import simulate_tournament
 from src.calibration.diagnostics import TournamentDiagnostics
+import time
 
 
 def run_monte_carlo(
@@ -18,28 +19,10 @@ def run_monte_carlo(
     collect_diagnostics: bool = False,
     retain_sim_results: bool = False,
 ) -> Tuple[List[SimulationSummaryRow], Optional[TournamentDiagnostics], Optional[List[TournamentSimResult]]]:
-    """
-    Run Monte Carlo simulation of tournament.
 
-    Args:
-        player_ratings: List of player rating dicts
-        config: TournamentConfig
-        num_sims: Number of simulations to run
-        seed: Random seed for reproducibility (optional)
-        collect_diagnostics: Whether to collect detailed diagnostics (optional)
-        retain_sim_results: Whether to retain individual simulation results (optional)
-
-    Returns:
-        Tuple of (summary_rows, diagnostics, sim_results)
-        - summary_rows: List of SimulationSummaryRow objects
-        - diagnostics: TournamentDiagnostics object if collect_diagnostics=True, else None
-        - sim_results: List of TournamentSimResult objects if retain_sim_results=True, else None
-    """
-    # Initialize RNG
     base_rng = random.Random(seed)
 
-    # Track stats across all sims
-    player_stats = defaultdict(lambda: {
+    player_stats: defaultdict = defaultdict(lambda: {
         "wins": 0,
         "top3": 0,
         "top5": 0,
@@ -52,41 +35,49 @@ def run_monte_carlo(
         "player_name": "",
     })
 
-    # Initialize diagnostics if requested
     diagnostics = TournamentDiagnostics() if collect_diagnostics else None
     course_par = config.course.total_par
 
-    # Optionally retain individual sim results
     sim_results = [] if retain_sim_results else None
+
+    # ✅ FIX 1: move start_time OUTSIDE loop
+    start_time = time.time()
 
     # Run simulations
     for sim_num in range(num_sims):
-        # Create a new RNG for this simulation (for reproducibility)
+
         sim_seed = base_rng.randint(0, 2**31 - 1)
         sim_rng = random.Random(sim_seed)
 
-        # Run tournament
         result = simulate_tournament(player_ratings, config, sim_rng)
 
-        # Retain result if requested
-        if retain_sim_results:
+        # ✅ FIX 2: only print every 500 sims
+        completed = sim_num + 1
+        if completed % 500 == 0 or completed == num_sims:
+            elapsed = time.time() - start_time
+            sims_per_sec = completed / elapsed if elapsed > 0 else 0
+            remaining = (num_sims - completed) / sims_per_sec if sims_per_sec > 0 else 0
+
+            print(
+                f"{completed}/{num_sims} sims | "
+                f"{sims_per_sec:.2f} sims/sec | "
+                f"ETA: {remaining/60:.1f} min"
+            )
+
+        if retain_sim_results and sim_results is not None:
             sim_results.append(result)
 
-        # Collect diagnostics if requested
         if diagnostics:
             diagnostics.record_tournament(result, course_par)
 
-        # Aggregate stats
         for player_result in result.player_results:
             pid = player_result.player_id
             stats = player_stats[pid]
 
-            # Store player name
             if not stats["player_name"]:
                 stats["player_name"] = player_result.player_name
 
-            # Count stats
-            stats["sims"] += 1
+            stats["sims"] = int(stats["sims"]) + 1
             stats["total_finish"] += player_result.finish_position
             stats["total_score"] += player_result.total_to_par
 
@@ -103,7 +94,6 @@ def run_monte_carlo(
             if player_result.made_cut:
                 stats["made_cut"] += 1
 
-    # Convert to summary rows
     summary_rows = []
     for player_id, stats in player_stats.items():
         n_sims = stats["sims"]
@@ -123,10 +113,9 @@ def run_monte_carlo(
         )
         summary_rows.append(row)
 
-    # Sort by win percentage (descending)
     summary_rows.sort(key=lambda x: x.win_pct, reverse=True)
 
-    # DEBUG: Print eagle probability audit
+    # Debug audit (unchanged)
     from src.sim.hole_engine import simulate_hole
     if hasattr(simulate_hole, 'eagle_prob_count') and simulate_hole.eagle_prob_count > 0:
         avg_eagle_prob = simulate_hole.eagle_prob_sum / simulate_hole.eagle_prob_count

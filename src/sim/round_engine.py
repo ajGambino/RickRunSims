@@ -39,19 +39,19 @@ def simulate_round(
             hole_scores.append(score)
             hole_outcomes.append(outcome)
 
-        # Create round result
+            # Create round result
+        total_score = sum(hole_scores)
+        round_par = course.total_par
+        score_to_par = total_score - round_par
+
         round_result = PlayerRoundResult(
             player_id=player_rating["player_id"],
             player_name=player_rating["player_name"],
             round_number=round_number,
             hole_scores=hole_scores,
             hole_outcomes=hole_outcomes,
+            _score_to_par=score_to_par
         )
-
-        # Calculate score to par
-        total_score = round_result.total_score
-        round_par = course.total_par
-        round_result._score_to_par = total_score - round_par
 
         results.append(round_result)
 

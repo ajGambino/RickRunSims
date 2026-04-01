@@ -7,7 +7,7 @@ produces realistic score distributions, winning scores, cut lines, etc.
 This is NOT about fitting or ML - just basic measurement.
 """
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Any
 from collections import defaultdict
 import statistics
 
@@ -105,7 +105,7 @@ class TournamentDiagnostics:
 
                     self.player_hole_outcomes[player_id]["total_holes"] += 1
 
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> Dict[str, Any]:
         """
         Compute summary statistics from collected diagnostics.
 
@@ -140,7 +140,7 @@ class TournamentDiagnostics:
 
         return summary
 
-    def get_player_summary(self, player_id: str, player_name: str) -> Dict:
+    def get_player_summary(self, player_id: str, player_name: str) -> Dict[str, Any]:
         """
         Get diagnostics for a specific player.
 
@@ -151,7 +151,7 @@ class TournamentDiagnostics:
         Returns:
             Dictionary with player-specific metrics
         """
-        summary = {"player_id": player_id, "player_name": player_name}
+        summary: Dict[str, Any] = {"player_id": player_id, "player_name": player_name}
 
         # Round score statistics
         if player_id in self.player_round_scores and self.player_round_scores[player_id]:

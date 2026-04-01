@@ -3,16 +3,74 @@ RickRunSims - Golf Tournament Monte Carlo Simulator
 Main CLI entrypoint.
 """
 import argparse
-import time
+import os
 import random
+import time
+from datetime import datetime
+
+from src.analysis.validation import (
+    export_validation_report,
+    print_validation_report,
+    validate_simulation,
+)
 from src.data.loader import load_tournament_data
 from src.features.rating_builder import build_player_rating
+from src.outputs.diagnostics_report import (
+    print_diagnostics_summary,
+    print_top_players_diagnostics,
+)
+from src.outputs.export_csv import (
+    export_diagnostics_csv,
+    export_finish_distribution_csv,
+    export_leaderboard_csv,
+    export_sim_results_csv,
+    export_summary_csv,
+)
+from src.outputs.reports import print_quick_summary, print_simulation_summary
 from src.sim.runner import run_monte_carlo
 from src.sim.tournament_engine import simulate_tournament
-from src.outputs.reports import print_simulation_summary, print_quick_summary
-from src.outputs.export_csv import export_summary_csv, export_leaderboard_csv, export_diagnostics_csv, export_sim_results_csv, export_finish_distribution_csv
-from src.outputs.diagnostics_report import print_diagnostics_summary, print_top_players_diagnostics
-from src.analysis.validation import validate_simulation, print_validation_report, export_validation_report
+
+
+def is_private_run(args) -> bool:
+    """Return True if this run is using the private raw-data pipeline."""
+    return args.raw_player_csv is not None
+
+
+def configure_private_output_defaults(args) -> str | None:
+    """
+    For private runs, auto-route exports into a timestamped directory under
+    data/private/processed/ unless the user already provided explicit paths.
+
+    Returns:
+        The created base directory for this private run, or None if not applicable.
+    """
+    if not is_private_run(args):
+        return None
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_dir = os.path.join("data", "private", "processed", f"run_{timestamp}")
+    os.makedirs(base_dir, exist_ok=True)
+
+    # Only set defaults when the user did not explicitly provide a path.
+    if not args.export_summary:
+        args.export_summary = os.path.join(base_dir, "summary.csv")
+
+    if not args.export_leaderboard:
+        args.export_leaderboard = os.path.join(base_dir, "leaderboard.csv")
+
+    if not args.export_diagnostics and (args.diagnostics or args.validate):
+        args.export_diagnostics = os.path.join(base_dir, "diagnostics.csv")
+
+    if not args.export_sim_results:
+        args.export_sim_results = os.path.join(base_dir, "sim_results.csv")
+
+    if not args.export_finish_distribution:
+        args.export_finish_distribution = os.path.join(base_dir, "finish_dist.csv")
+
+    if args.validate and not args.export_validation:
+        args.export_validation = os.path.join(base_dir, "validation")
+
+    return base_dir
 
 
 def main():
@@ -123,10 +181,16 @@ def main():
 
     args = parser.parse_args()
 
+    # Auto-route outputs for private runs unless explicit export paths were provided.
+    private_output_dir = configure_private_output_defaults(args)
+
     # Print banner
     print("\n" + "=" * 100)
     print("RickRunSims - Golf Tournament Monte Carlo Simulator")
     print("=" * 100)
+
+    if private_output_dir:
+        print(f"\nPrivate run detected -> default exports routed to: {private_output_dir}")
 
     # Load tournament data
     print(f"\nLoading tournament: {args.tournament}...")
@@ -146,27 +210,32 @@ def main():
             raw_player_csv=args.raw_player_csv,
             raw_round_csv=args.raw_round_csv,
         )
-        print(f" Loaded {len(player_field)} players")
-        print(f" Course: {config.course.name} (Par {config.course.total_par})")
-        print(f" Format: {config.num_rounds} rounds")
+        print(f"Loaded {len(player_field)} players")
+        print(f"Course: {config.course.name} (Par {config.course.total_par})")
+        print(f"Format: {config.num_rounds} rounds")
         if config.cut_after_round:
-            print(f" Cut: After round {config.cut_after_round} ({config.cut_rule})")
+            print(f"Cut: After round {config.cut_after_round} ({config.cut_rule})")
     except Exception as e:
-        print(f" Error loading tournament: {e}")
+        print(f"Error loading tournament: {e}")
         return 1
 
     # Build player ratings
     print("\nPreparing player ratings...")
     player_ratings = [build_player_rating(p) for p in player_field]
-    print(f" {len(player_ratings)} players ready")
+    print(f"{len(player_ratings)} players ready")
 
     # Run simulations
     print(f"\nRunning {args.sims:,} simulations...")
     start_time = time.time()
 
     try:
-        collect_diag = args.diagnostics or args.export_diagnostics is not None or args.validate
+        collect_diag = (
+            args.diagnostics
+            or args.export_diagnostics is not None
+            or args.validate
+        )
         retain_sims = args.export_sim_results is not None
+
         summary, diagnostics, sim_results = run_monte_carlo(
             player_ratings=player_ratings,
             config=config,
@@ -176,13 +245,13 @@ def main():
             retain_sim_results=retain_sims,
         )
     except Exception as e:
-        print(f" Error running simulations: {e}")
+        print(f"Error running simulations: {e}")
         import traceback
         traceback.print_exc()
         return 1
 
     elapsed = time.time() - start_time
-    print(f" Completed in {elapsed:.2f} seconds ({args.sims / elapsed:.0f} sims/sec)")
+    print(f"Completed in {elapsed:.2f} seconds ({args.sims / elapsed:.0f} sims/sec)")
 
     # Display results
     print_simulation_summary(summary, config.name, args.sims, top_n=args.top)
@@ -196,20 +265,20 @@ def main():
             export_summary_csv(summary, args.export_summary)
             exports_written.append(f"Summary: {args.export_summary}")
         except Exception as e:
-            print(f"\n✗ Error exporting summary: {e}")
+            print(f"\nError exporting summary: {e}")
             return 1
 
     if args.export_leaderboard:
         try:
             # Run one representative tournament for leaderboard export
-            print(f"\nGenerating representative tournament leaderboard...")
-            rep_seed = args.seed if args.seed else random.randint(0, 2**31 - 1)
+            print("\nGenerating representative tournament leaderboard...")
+            rep_seed = args.seed if args.seed is not None else random.randint(0, 2**31 - 1)
             rep_rng = random.Random(rep_seed)
             rep_result = simulate_tournament(player_ratings, config, rep_rng)
             export_leaderboard_csv(rep_result, args.export_leaderboard)
             exports_written.append(f"Leaderboard: {args.export_leaderboard}")
         except Exception as e:
-            print(f"\n✗ Error exporting leaderboard: {e}")
+            print(f"\nError exporting leaderboard: {e}")
             return 1
 
     # Display diagnostics if requested
@@ -218,7 +287,6 @@ def main():
             print_diagnostics_summary(diagnostics, args.sims)
             print_top_players_diagnostics(diagnostics, player_ratings, top_n=5)
 
-        # Export diagnostics if requested
         if args.export_diagnostics:
             try:
                 export_diagnostics_csv(diagnostics, args.export_diagnostics, args.sims)
@@ -227,7 +295,6 @@ def main():
                 print(f"\nError exporting diagnostics: {e}")
                 return 1
 
-        # Run validation if requested
         if args.validate:
             try:
                 # Load benchmark configuration
@@ -236,7 +303,7 @@ def main():
                     benchmark_config = get_benchmark_config()
                     benchmark_name = "Masters Baseline"
                 else:
-                    print(f"\n✗ Error: Unknown validation config: {args.validation_config}")
+                    print(f"\nError: Unknown validation config: {args.validation_config}")
                     return 1
 
                 # Run validation
@@ -246,7 +313,7 @@ def main():
                     benchmark_config=benchmark_config,
                     num_sims=args.sims,
                     tournament_name=config.name,
-                    benchmark_name=benchmark_name
+                    benchmark_name=benchmark_name,
                 )
 
                 # Print validation report
@@ -258,31 +325,37 @@ def main():
                     exports_written.append(f"Validation: {args.export_validation}/")
 
             except Exception as e:
-                print(f"\n✗ Error running validation: {e}")
+                print(f"\nError running validation: {e}")
                 import traceback
                 traceback.print_exc()
                 return 1
 
     # Export sim results if requested
-    if args.export_sim_results:
+    if args.export_sim_results and sim_results is not None:
         try:
-            export_sim_results_csv(sim_results, args.export_sim_results, top_n=args.sim_results_top)
+            export_sim_results_csv(
+                sim_results,
+                args.export_sim_results,
+                top_n=args.sim_results_top,
+            )
             exports_written.append(f"Sim Results: {args.export_sim_results}")
         except Exception as e:
-            print(f"\n✗ Error exporting sim results: {e}")
+            print(f"\nError exporting sim results: {e}")
             return 1
 
     # Export finish distribution if requested
     if args.export_finish_distribution:
         try:
             export_finish_distribution_csv(summary, args.export_finish_distribution)
-            exports_written.append(f"Finish Distribution: {args.export_finish_distribution}")
+            exports_written.append(
+                f"Finish Distribution: {args.export_finish_distribution}"
+            )
         except Exception as e:
-            print(f"\n✗ Error exporting finish distribution: {e}")
+            print(f"\nError exporting finish distribution: {e}")
             return 1
 
     if exports_written:
-        print(f"\nExports written:")
+        print("\nExports written:")
         for export in exports_written:
             print(f"  - {export}")
 
@@ -290,4 +363,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    raise SystemExit(main())

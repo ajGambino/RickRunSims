@@ -26,5 +26,5 @@ secrets.json
 # notes
 notes/*.txt
 .claude/settings.local.json
-
+CHANGELOG.md
 

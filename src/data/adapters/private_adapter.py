@@ -4,10 +4,15 @@ Private raw data adapter - loads player data from private/proprietary raw golf s
 This adapter transforms raw strokes-gained and performance statistics into
 simulation-ready PlayerProfile objects.
 
-All file paths must be passed as parameters
+NOTE:
+This adapter expects private/raw data not included in this repository.
+Users should provide their own CSVs with the required schema.
+All file paths must be passed as parameters.
 """
 import csv
 import math
+import re
+import unicodedata
 from pathlib import Path
 from typing import List, Optional, Dict, Sequence
 from collections import defaultdict
@@ -37,13 +42,109 @@ PAR4_MAX = 2.0
 PAR5_MAX = 3.0
 
 # Birdie boost & bogey avoid modifiers (modest effects)
-BIRDIE_BOOST_SCALE = 0.10  # Max effect from raw inputs
+BIRDIE_BOOST_SCALE = 0.045  # Max effect from raw inputs
 BOGEY_AVOID_SCALE = 0.10  # Max effect from raw inputs
 
 # Volatility defaults
 DEFAULT_VOLATILITY = 0.25
 VOLATILITY_MIN = 0.15
 VOLATILITY_MAX = 0.50
+
+# Masters 2026 field
+MASTERS_2026_FIELD = {
+    "Ludvig Aberg",
+    "Daniel Berger",
+    "Akshay Bhatia",
+    "Keegan Bradley",
+    "Michael Brennan",
+    "Jacob Bridgeman",
+    "Sam Burns",
+    "Angel Cabrera",
+    "Brian Campbell",
+    "Patrick Cantlay",
+    "Wyndham Clark",
+    "Corey Conners",
+    "Fred Couples",
+    "Jason Day",
+    "Bryson DeChambeau",
+    "Nicolas Echavarria",
+    "Harris English",
+    "Ethan Fang",
+    "Matt Fitzpatrick",
+    "Tommy Fleetwood",
+    "Ryan Fox",
+    "Sergio Garcia",
+    "Ryan Gerard",
+    "Chris Gotterup",
+    "Max Greyserman",
+    "Ben Griffin",
+    "Harry Hall",
+    "Brian Harman",
+    "Tyrrell Hatton",
+    "Russell Henley",
+    "Jackson Herrington",
+    "Nicolai Hojgaard",
+    "Rasmus Hojgaard",
+    "Brandon Holtz",
+    "Max Homa",
+    "Viktor Hovland",
+    "Mason Howell",
+    "Sungjae Im",
+    "Casey Jarvis",
+    "Dustin Johnson",
+    "Zach Johnson",
+    "Naoyuki Kataoka",
+    "John Keefer",
+    "Si Woo Kim",
+    "Michael Kim",
+    "Kurt Kitayama",
+    "Jake Knapp",
+    "Brooks Koepka",
+    "Fifa Laopakdee",
+    "Min Woo Lee",
+    "Haotong Li",
+    "Shane Lowry",
+    "Robert MacIntyre",
+    "Hideki Matsuyama",
+    "Matt McCarty",
+    "Rory McIlroy",
+    "Tom McKibbin",
+    "Maverick McNealy",
+    "Phil Mickelson",
+    "Collin Morikawa",
+    "Rasmus Neergaard-Petersen",
+    "Alex Noren",
+    "Andrew Novak",
+    "José María Olazábal",
+    "Carlos Ortiz",
+    "Marco Penge",
+    "Aldrich Potgieter",
+    "Mateo Pulcini",
+    "Jon Rahm",
+    "Aaron Rai",
+    "Patrick Reed",
+    "Kristoffer Reitan",
+    "Davis Riley",
+    "Justin Rose",
+    "Xander Schauffele",
+    "Scottie Scheffler",
+    "Charl Schwartzel",
+    "Adam Scott",
+    "Vijay Singh",
+    "Cameron Smith",
+    "J.J. Spaun",
+    "Jordan Spieth",
+    "Samuel Stevens",
+    "Sepp Straka",
+    "Nick Taylor",
+    "Justin Thomas",
+    "Sami Valimaki",
+    "Bubba Watson",
+    "Mike Weir",
+    "Danny Willett",
+    "Gary Woodland",
+    "Cameron Young",
+}
 
 
 # ============================================================================
@@ -80,9 +181,13 @@ def load_players_from_raw(
             raise FileNotFoundError(f"Round CSV not found: {round_csv_path}")
         player_round_data = _load_round_data(round_csv_path)
 
+    # Normalize Masters field names once for matching
+    normalized_field = {normalize_name(name) for name in MASTERS_2026_FIELD}
+    matched_field_names = set()
+
     # Load and transform player data
     players = []
-    with open(player_file, 'r', encoding='utf-8') as f:
+    with open(player_file, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         # Validate required columns
@@ -90,12 +195,24 @@ def load_players_from_raw(
 
         for row in reader:
             # Skip rows with missing critical data
-            if not row.get('player_id') or not row.get('name'):
+            if not row.get("player_id") or not row.get("name"):
                 continue
 
+            raw_name = row.get("name", "").strip()
+            normalized_name = normalize_name(raw_name)
+
+            # Keep only confirmed Masters field players
+            if normalized_name not in normalized_field:
+                continue
+
+            matched_field_names.add(normalized_name)
+
             # Skip players with insufficient sample size
-            rounds = _safe_float(row.get('rounds'), 0.0)
-            sg_rounds = _safe_float(row.get('sg_rounds'), rounds if rounds is not None else 0.0)
+            rounds = _safe_float(row.get("rounds"), 0.0)
+            sg_rounds = _safe_float(
+                row.get("sg_rounds"),
+                rounds if rounds is not None else 0.0,
+            )
             if sg_rounds is None or sg_rounds < MIN_ROUNDS_PARTIAL:
                 continue
 
@@ -104,7 +221,18 @@ def load_players_from_raw(
             players.append(player)
 
     if not players:
-        raise ValueError("No valid players found in CSV (check sample sizes)")
+        raise ValueError(
+            "No valid Masters field players found in CSV (check field names and sample sizes)"
+        )
+
+    missing_from_csv = sorted(normalized_field - matched_field_names)
+
+    print(f"Matched {len(players)} Masters players from raw CSV")
+
+    if missing_from_csv:
+        print("\nWarning: These Masters field names did not match any row in the raw CSV:")
+        for name in missing_from_csv:
+            print(f"  - {name}")
 
     return players
 
@@ -118,12 +246,12 @@ def _load_round_data(round_csv_path: str) -> Dict[str, List[float]]:
     """
     player_rounds = defaultdict(list)
 
-    with open(round_csv_path, 'r', encoding='utf-8') as f:
+    with open(round_csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         for row in reader:
-            player_name = row.get('Player', '').strip()
-            tot = _safe_float(row.get('TOT'))
+            player_name = normalize_name(row.get("Player", "").strip())
+            tot = _safe_float(row.get("TOT"))
 
             if player_name and tot is not None:
                 player_rounds[player_name].append(tot)
@@ -136,7 +264,7 @@ def _validate_required_columns(fieldnames: Optional[Sequence[str]]) -> None:
     if not fieldnames:
         raise ValueError("CSV file is empty or has no header")
 
-    required = ['player_id', 'name', 'sg_tot']
+    required = ["player_id", "name", "sg_tot"]
     missing = set(required) - set(fieldnames)
 
     if missing:
@@ -166,21 +294,23 @@ def _build_player_profile(
     - consistency: Inverse of volatility
     - aggression: Neutral default for now
     """
-    player_id = row['player_id'].strip()
-    name = row['name'].strip()
+    player_id = row["player_id"].strip()
+    name = row["name"].strip()
 
     # Sample size for shrinkage
-    rounds = _safe_float(row.get('rounds'), 0.0)
-    sg_rounds = _safe_float(row.get('sg_rounds'), rounds if rounds is not None else 0.0)
-    shrinkage_weight = _calculate_shrinkage_weight(sg_rounds if sg_rounds is not None else 0.0)
+    rounds = _safe_float(row.get("rounds"), 0.0)
+    sg_rounds = _safe_float(row.get("sg_rounds"), rounds if rounds is not None else 0.0)
+    shrinkage_weight = _calculate_shrinkage_weight(
+        sg_rounds if sg_rounds is not None else 0.0
+    )
 
     # Build skill rating
     skill_rating = _derive_skill_rating(row, shrinkage_weight)
 
     # Build par-specific skills
-    par3_skill = _derive_par_skill(row, 'sg_par_3', shrinkage_weight, PAR3_MAX)
-    par4_skill = _derive_par_skill(row, 'sg_par_4', shrinkage_weight, PAR4_MAX)
-    par5_skill = _derive_par_skill(row, 'sg_par_5', shrinkage_weight, PAR5_MAX)
+    par3_skill = _derive_par_skill(row, "sg_par_3", shrinkage_weight, PAR3_MAX)
+    par4_skill = _derive_par_skill(row, "sg_par_4", shrinkage_weight, PAR4_MAX)
+    par5_skill = _derive_par_skill(row, "sg_par_5", shrinkage_weight, PAR5_MAX)
 
     # Build birdie boost
     birdie_boost = _derive_birdie_boost(row, shrinkage_weight)
@@ -222,30 +352,29 @@ def _derive_skill_rating(row: Dict[str, str], shrinkage: float) -> float:
     3. Optional light recent-form adjustment
     4. Apply shrinkage to pull toward field mean
     """
-    sg_tot = _safe_float(row.get('sg_tot'), 0.0) or 0.0
-    w_sg_tot = _safe_float(row.get('w_sg_tot'))
+    sg_tot = _safe_float(row.get("sg_tot"), 0.0) or 0.0
+    w_sg_tot = _safe_float(row.get("w_sg_tot"))
 
     # Start with sg_tot
     base_sg = sg_tot
 
     # Optionally blend with weighted SG if available (70/30 split)
     if w_sg_tot is not None:
-        base_sg = 0.7 * sg_tot + 0.3 * w_sg_tot  # type: ignore
+        base_sg = 0.7 * sg_tot + 0.3 * w_sg_tot
 
     # Optionally add light recent-form adjustment (app/ott/putt L12)
     recent_form_adj = 0.0
-    sg_app_l12 = _safe_float(row.get('sg_app_l_12'), 0.0)
-    sg_ott_l12 = _safe_float(row.get('sg_ott_l_12'), 0.0)
-    sg_putt_l12 = _safe_float(row.get('sg_putt_l_12'), 0.0)
+    sg_app_l12 = _safe_float(row.get("sg_app_l_12"), 0.0)
+    sg_ott_l12 = _safe_float(row.get("sg_ott_l_12"), 0.0)
+    sg_putt_l12 = _safe_float(row.get("sg_putt_l_12"), 0.0)
 
     if all(x is not None for x in [sg_app_l12, sg_ott_l12, sg_putt_l12]):
         recent_form = (sg_app_l12 or 0.0) + (sg_ott_l12 or 0.0) + (sg_putt_l12 or 0.0)
-        # These have defaults so they won't be None
-        sg_app_val = _safe_float(row.get('sg_app'), 0.0) or 0.0
-        sg_ott_val = _safe_float(row.get('sg_ott'), 0.0) or 0.0
-        sg_putt_val = _safe_float(row.get('sg_putt'), 0.0) or 0.0
+        sg_app_val = _safe_float(row.get("sg_app"), 0.0) or 0.0
+        sg_ott_val = _safe_float(row.get("sg_ott"), 0.0) or 0.0
+        sg_putt_val = _safe_float(row.get("sg_putt"), 0.0) or 0.0
         season_form = sg_app_val + sg_ott_val + sg_putt_val
-        recent_form_adj = 0.10 * (recent_form - season_form)  # 10% weight on delta
+        recent_form_adj = 0.10 * (recent_form - season_form)
 
     # Combined SG
     final_sg = base_sg + recent_form_adj
@@ -301,22 +430,21 @@ def _derive_birdie_boost(row: Dict[str, str], shrinkage: float) -> float:
 
     Keep effect modest (max ~0.10)
     """
-    # Get components
-    bob = _safe_float(row.get('bob'))
-    bobg = _safe_float(row.get('bobg'))
-    sg_app = _safe_float(row.get('sg_app'), 0.0) or 0.0
-    sg_putt = _safe_float(row.get('sg_putt'), 0.0) or 0.0
-    sg_par_5 = _safe_float(row.get('sg_par_5'), 0.0) or 0.0
-    gir = _safe_float(row.get('gir'))
+    bob = _safe_float(row.get("bob"))
+    bobg = _safe_float(row.get("bobg"))
+    sg_app = _safe_float(row.get("sg_app"), 0.0) or 0.0
+    sg_putt = _safe_float(row.get("sg_putt"), 0.0) or 0.0
+    sg_par_5 = _safe_float(row.get("sg_par_5"), 0.0) or 0.0
+    gir = _safe_float(row.get("gir"))
 
     # Build composite score
     score = 0.0
 
-    # Bob/bobg contribution (normalize: ~4.0 bobg is elite)
+    # Bob/bobg contribution (normalize: ~0.5 bobg is elite, ~0.0 is tour average)
     if bobg is not None:
-        score += (bobg - 3.5) * 0.3  # Center at 3.5, scale by 0.3
+        score += bobg * 1.2  # Elite ~0.5 → +1.0, Average ~0.0 → 0.0
     elif bob is not None:
-        score += (bob / 18.0 - 3.5) * 0.3  # Convert bob to per-round equivalent
+        score += (bob - 4.0) * 0.5  # Elite ~6 birdies/round → +1.0
 
     # SG contributions
     score += sg_app * 0.3
@@ -345,14 +473,14 @@ def _derive_bogey_avoidance(row: Dict[str, str], shrinkage: float) -> float:
 
     Keep effect modest (max ~0.10)
     """
-    bogey_avoid = _safe_float(row.get('bogey_avoid'), 0.0) or 0.0
-    scrambling = _safe_float(row.get('scrambling'))
+    bogey_avoid = _safe_float(row.get("bogey_avoid"), 0.0) or 0.0
+    scrambling = _safe_float(row.get("scrambling"))
 
     # Build score
     score = 0.0
 
-    # Bogey avoid contribution (normalize: ~1.0 is average)
-    score += (bogey_avoid - 1.0) * 0.6
+    # Bogey avoid contribution (normalize: ~0.15 is average for bogey_avoid stat)
+    score += (bogey_avoid - 0.15) * 6.0  # Elite ~0.18 → +0.18, Average ~0.15 → 0.0
 
     # Scrambling contribution (normalize: ~60% is tour average)
     if scrambling is not None:
@@ -381,30 +509,26 @@ def _derive_volatility(
     3. Apply shrinkage toward default
     4. Clamp to reasonable range
     """
-    if round_data and name in round_data:
-        tot_values = round_data[name]
-        if len(tot_values) >= 5:  # Need at least 5 rounds
+    normalized_name = normalize_name(name)
+
+    if round_data and normalized_name in round_data:
+        tot_values = round_data[normalized_name]
+        if len(tot_values) >= 5:
             stdev = _compute_stdev(tot_values)
-            # Map stdev to volatility (typical stdev: 1.5-3.0)
-            # 1.5 stdev -> 0.15 volatility
-            # 2.5 stdev -> 0.25 volatility
-            # 3.5 stdev -> 0.35 volatility
             volatility = 0.10 * stdev
             volatility = max(VOLATILITY_MIN, min(VOLATILITY_MAX, volatility))
             return volatility
 
     # Fallback proxy: use variance indicators from player stats
-    # Higher skill variance indicators -> higher volatility
     fallback = DEFAULT_VOLATILITY
 
-    # If we have sg_app and sg_ott, use their magnitude as variance proxy
-    sg_app = _safe_float(row.get('sg_app'), 0.0) or 0.0
-    sg_ott = _safe_float(row.get('sg_ott'), 0.0) or 0.0
-    sg_putt = _safe_float(row.get('sg_putt'), 0.0) or 0.0
+    sg_app = _safe_float(row.get("sg_app"), 0.0) or 0.0
+    sg_ott = _safe_float(row.get("sg_ott"), 0.0) or 0.0
+    sg_putt = _safe_float(row.get("sg_putt"), 0.0) or 0.0
 
     # Players with extreme strengths/weaknesses tend to be more volatile
     skill_spread = abs(sg_app - sg_ott) + abs(sg_putt - sg_app)
-    volatility_adj = skill_spread * 0.02  # Small adjustment based on imbalance
+    volatility_adj = skill_spread * 0.02
 
     fallback = DEFAULT_VOLATILITY + volatility_adj
     fallback = max(VOLATILITY_MIN, min(VOLATILITY_MAX, fallback))
@@ -422,21 +546,30 @@ def _derive_consistency(volatility: float) -> float:
     Lower volatility -> higher consistency
     Map volatility [0.15, 0.50] to consistency [0.7, 0.0]
     """
-    # Normalize volatility to 0-1 scale
     vol_normalized = (volatility - VOLATILITY_MIN) / (VOLATILITY_MAX - VOLATILITY_MIN)
-
-    # Invert: high volatility = low consistency
     consistency = 1.0 - vol_normalized
-
-    # Scale to meaningful range (0.0 to 0.7, where 0.7 is very consistent)
     consistency = consistency * 0.7
-
     return max(0.0, min(1.0, consistency))
 
 
 # ============================================================================
 # Helper Functions
 # ============================================================================
+
+def normalize_name(name: str) -> str:
+    """
+    Normalize names for robust matching:
+    - lowercase
+    - strip accents
+    - remove punctuation
+    - collapse whitespace
+    """
+    name = name.lower().strip()
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    name = re.sub(r"[^a-z0-9\s]", "", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name
+
 
 def _calculate_shrinkage_weight(rounds: float) -> float:
     """
@@ -452,10 +585,11 @@ def _calculate_shrinkage_weight(rounds: float) -> float:
     if rounds >= MIN_ROUNDS_FULL_WEIGHT:
         return 1.0
     elif rounds <= MIN_ROUNDS_PARTIAL:
-        return 0.3  # Minimum weight
+        return 0.3
     else:
-        # Linear interpolation between partial and full
-        return 0.3 + 0.7 * (rounds - MIN_ROUNDS_PARTIAL) / (MIN_ROUNDS_FULL_WEIGHT - MIN_ROUNDS_PARTIAL)
+        return 0.3 + 0.7 * (
+            rounds - MIN_ROUNDS_PARTIAL
+        ) / (MIN_ROUNDS_FULL_WEIGHT - MIN_ROUNDS_PARTIAL)
 
 
 def _safe_float(value: Optional[str], default: Optional[float] = None) -> Optional[float]:
@@ -464,7 +598,7 @@ def _safe_float(value: Optional[str], default: Optional[float] = None) -> Option
 
     Returns None if value is missing/empty and default is None.
     """
-    if value is None or value == '':
+    if value is None or value == "":
         return default
 
     try:

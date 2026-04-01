@@ -11,8 +11,9 @@ class PlayerRoundResult:
     player_id: str
     player_name: str
     round_number: int
-    hole_scores: list[int]  # Absolute score for each hole
-    hole_outcomes: list[str] = field(default_factory=list)  # Categorical outcome for each hole (eagle/birdie/par/bogey/double)
+    hole_scores: list[int]
+    hole_outcomes: list[str] = field(default_factory=list)
+    _score_to_par: int = 0
 
     @property
     def total_score(self) -> int:
@@ -20,9 +21,7 @@ class PlayerRoundResult:
 
     @property
     def score_to_par(self) -> int:
-        """Score relative to par (calculated by tournament engine)."""
-        # Will be set by tournament engine which knows the course par
-        return getattr(self, '_score_to_par', 0)
+        return self._score_to_par
 
 
 @dataclass
@@ -32,7 +31,7 @@ class PlayerTournamentResult:
     player_name: str
     rounds: list[PlayerRoundResult]
     made_cut: bool
-    finish_position: int = 0  # 1 = winner, 0 = not yet determined
+    finish_position: int = 0
 
     @property
     def total_score(self) -> int:
@@ -40,8 +39,7 @@ class PlayerTournamentResult:
 
     @property
     def total_to_par(self) -> int:
-        """Total score relative to par."""
-        return sum(getattr(r, '_score_to_par', 0) for r in self.rounds)
+        return sum(r.score_to_par for r in self.rounds)
 
 
 @dataclass

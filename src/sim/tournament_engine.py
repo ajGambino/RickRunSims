@@ -53,7 +53,7 @@ def simulate_tournament(
             player_results[rr.player_id].rounds.append(rr)
 
         # Apply cut if this is the cut round
-        if config.cut_after_round == round_num:
+        if config.cut_after_round == round_num and config.cut_rule is not None:
             # Convert player_results dict to list for cut engine
             results_list = list(player_results.values())
             made_cut_ids = apply_cut(results_list, config.cut_rule)
