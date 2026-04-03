@@ -12,19 +12,9 @@ Built to simulate major championships like the Masters with realistic:
 
 ## Validation Snapshot (Masters 2026, 5,000 sims)
 
-- Winning Score: -13.97
-- Cut Line: +3.36
-- Field Average: +2.35
+![Validation Results](validation.png)
 
-**Score Distribution:**
-
-- Eagle: 0.99%
-- Birdie: 19.94%
-- Par: 59.35%
-- Bogey: 13.68%
-- Double+: 6.04%
-
-All 10 validation checks passed.
+![Simulation Results](results.png)
 
 ---
 
