@@ -30,6 +30,23 @@ All 10 validation checks passed.
 
 ## Quick Start
 
+### One-Click Demo
+
+Run a full demo simulation with bundled sample data:
+
+```bash
+python demo.py
+```
+
+This will:
+
+- run the Masters 2026 simulation using demo player data
+- execute 1,000 Monte Carlo simulations
+- collect diagnostics and validation metrics
+- print results to the terminal
+
+No setup or data required.
+
 ### Installation
 
 ```bash
