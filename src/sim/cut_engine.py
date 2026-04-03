@@ -41,22 +41,27 @@ def _apply_top_n_and_ties(
     Returns:
         Set of player_ids who made the cut
     """
-    # Sort by total score (lower is better)
-    sorted_players = sorted(player_results, key=lambda p: p.total_to_par)
+    # Compute cut score based only on first 2 rounds (36 holes)
+    def cut_score(p: PlayerTournamentResult) -> int:
+        return sum(r.score_to_par for r in p.rounds[:2])
+    
 
+    # Sort by cut score (lower is better)
+    sorted_players = sorted(player_results, key=cut_score)
+    
     # Find the cut line score (score of the nth player)
     if len(sorted_players) <= n:
         # Everyone makes the cut if field is smaller than cut size
         return {p.player_id for p in sorted_players}
 
-    cut_line_score = sorted_players[n - 1].total_to_par
+    cut_line_score = cut_score(sorted_players[n - 1])
 
     # Include all players at or better than cut line (handles ties)
     made_cut = set()
     for player in sorted_players:
-        if player.total_to_par <= cut_line_score:
+        if cut_score(player) <= cut_line_score:
             made_cut.add(player.player_id)
         else:
             break
-
+            
     return made_cut

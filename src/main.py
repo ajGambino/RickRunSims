@@ -29,6 +29,7 @@ from src.outputs.export_csv import (
 from src.outputs.reports import print_quick_summary, print_simulation_summary
 from src.sim.runner import run_monte_carlo
 from src.sim.tournament_engine import simulate_tournament
+from src.sim.hole_engine import print_tail_calibration_diagnostics, DEBUG_TAIL_CALIBRATION
 
 
 def is_private_run(args) -> bool:
@@ -252,6 +253,10 @@ def main():
 
     elapsed = time.time() - start_time
     print(f"Completed in {elapsed:.2f} seconds ({args.sims / elapsed:.0f} sims/sec)")
+
+    # Print tail calibration diagnostics if enabled
+    if DEBUG_TAIL_CALIBRATION:
+        print_tail_calibration_diagnostics()
 
     # Display results
     print_simulation_summary(summary, config.name, args.sims, top_n=args.top)

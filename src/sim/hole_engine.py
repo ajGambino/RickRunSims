@@ -6,6 +6,7 @@ import random
 from src.data.schemas import HoleProfile
 
 DEBUG_HOLE_SIM = False
+DEBUG_TAIL_CALIBRATION = True  # Diagnostic for bogey/double+ distribution
 
 
 def simulate_hole(
@@ -72,19 +73,43 @@ def simulate_hole(
     baseline = {
         "eagle": 0.008,  # Reduced from 0.010 to control eagle inflation
         "birdie": 0.200,  # Increased from 0.190 to boost birdie rate
-        "par": 0.68,  # Adjusted to maintain sum = 1.0
-        "bogey": 0.095,
-        "double": 0.017,
+        "par": 0.640,  # Reduced from 0.68 to free up mass for bad outcomes
+        "bogey": 0.09,  # Increased from 0.095 to strengthen baseline error rate
+        "double": 0.055,  # Increased from 0.017 to strengthen tail baseline
     }
 
     # Adjust for player skill (0-100 scale, normalize to -1 to +1 range)
-    skill_factor = (skill - 50) / 50.0
+    skill_factor = (skill - 50) / 65.0
 
     # Adjust for hole difficulty (-0.5 to +0.6 typical range)
     difficulty_factor = hole.difficulty
 
     # Start with baseline
     probs = baseline.copy()
+
+    # Initialize diagnostics tracking
+    if not hasattr(simulate_hole, "diag_counters"):
+        simulate_hole.diag_counters = {
+            "total_holes": 0,
+            "below_avg_skill_fires": 0,
+            "harder_hole_fires": 0,
+            "skill_shift_sum": 0.0,
+            "diff_shift_sum": 0.0,
+            "bogey_before_skill": [],
+            "double_before_skill": [],
+            "bogey_after_skill": [],
+            "double_after_skill": [],
+            "bogey_before_diff": [],
+            "double_before_diff": [],
+            "bogey_after_diff": [],
+            "double_after_diff": [],
+            "bogey_before_norm": [],
+            "double_before_norm": [],
+            "bogey_after_norm": [],
+            "double_after_norm": [],
+        }
+
+    simulate_hole.diag_counters["total_holes"] += 1
 
     # Skill adjustments
     if skill_factor > 0:  # Better than average
@@ -98,21 +123,39 @@ def simulate_hole(
         probs["bogey"] -= shift * 0.05
         probs["double"] -= shift * 0.05
     else:  # Worse than average
+        simulate_hole.diag_counters["below_avg_skill_fires"] += 1
+        simulate_hole.diag_counters["bogey_before_skill"].append(probs["bogey"])
+        simulate_hole.diag_counters["double_before_skill"].append(probs["double"])
+
         shift = abs(skill_factor) * 0.12  # Reduced from 0.18 to be much less punitive
+        simulate_hole.diag_counters["skill_shift_sum"] += shift
+
         probs["eagle"] -= shift * 0.08
         probs["birdie"] -= shift * 0.25  # Reduced from 0.38 to preserve more birdie opportunity
         probs["par"] -= shift * 0.10
-        probs["bogey"] += shift * 0.22  # Reduced from 0.40 to control bogey inflation
-        probs["double"] += shift * 0.12  # Reduced from 0.18 to control double inflation
+        probs["bogey"] += shift * 0.14  # Reduced from 0.22 to shift mass to double+
+        probs["double"] += shift * 0.20  # Increased from 0.12 to capture tail risk
+
+        simulate_hole.diag_counters["bogey_after_skill"].append(probs["bogey"])
+        simulate_hole.diag_counters["double_after_skill"].append(probs["double"])
 
     # Difficulty adjustments
     if difficulty_factor > 0:  # Harder hole
+        simulate_hole.diag_counters["harder_hole_fires"] += 1
+        simulate_hole.diag_counters["bogey_before_diff"].append(probs["bogey"])
+        simulate_hole.diag_counters["double_before_diff"].append(probs["double"])
+
         shift = difficulty_factor * 0.10  # Reduced from 0.12 to soften field-wide scoring
+        simulate_hole.diag_counters["diff_shift_sum"] += shift
+
         probs["eagle"] -= shift * 0.003
         probs["birdie"] -= shift * 0.38  # Reduced from 0.527 to reduce birdie suppression
         probs["par"] -= shift * 0.06  # Reduced from 0.07 to stop par absorption
-        probs["bogey"] += shift * 0.24  # Reduced from 0.40 to control bogey inflation
-        probs["double"] += shift * 0.08  # Reduced from 0.20 to control double inflation
+        probs["bogey"] += shift * 0.16  # Reduced from 0.24 to shift mass to double+
+        probs["double"] += shift * 0.16  # Increased from 0.08 to strengthen tail on hard holes
+
+        simulate_hole.diag_counters["bogey_after_diff"].append(probs["bogey"])
+        simulate_hole.diag_counters["double_after_diff"].append(probs["double"])
     else:  # Easier hole
         shift = abs(difficulty_factor) * 0.07  # Reduced from 0.12 to soften field-wide scoring
         probs["eagle"] += shift * 0.003  # Reduced from 0.005 to control eagle
@@ -154,6 +197,10 @@ def simulate_hole(
     probs["double"] += vol_shift * 0.78
     probs["par"] -= vol_shift * 0.80
 
+    # Capture pre-normalization state
+    simulate_hole.diag_counters["bogey_before_norm"].append(probs["bogey"])
+    simulate_hole.diag_counters["double_before_norm"].append(probs["double"])
+
     # Apply safe floors BEFORE normalization to prevent probability collapse
     # These floors prevent the "floor trap" where negative values get clamped to 0.001
     # and then normalization artificially inflates par at the expense of scoring outcomes
@@ -169,6 +216,10 @@ def simulate_hole(
     total = sum(probs.values())
     for key in probs:
         probs[key] /= total
+
+    # Capture post-normalization state
+    simulate_hole.diag_counters["bogey_after_norm"].append(probs["bogey"])
+    simulate_hole.diag_counters["double_after_norm"].append(probs["double"])
 
     outcomes = ["eagle", "birdie", "par", "bogey", "double"]
     weights = [probs[o] for o in outcomes]
@@ -224,3 +275,82 @@ def simulate_hole(
     }
 
     return (score_map[result], result)
+
+
+def print_tail_calibration_diagnostics():
+    """Print diagnostic report for bogey/double+ redistribution analysis."""
+    if not hasattr(simulate_hole, "diag_counters"):
+        print("No diagnostic data collected.")
+        return
+
+    dc = simulate_hole.diag_counters
+    total = dc["total_holes"]
+
+    if total == 0:
+        print("No holes simulated yet.")
+        return
+
+    print("\n" + "=" * 70)
+    print("TAIL CALIBRATION DIAGNOSTICS")
+    print("=" * 70)
+
+    # Branch activation rates
+    print(f"\n1. BRANCH ACTIVATION")
+    print(f"   Total holes simulated: {total:,}")
+    print(f"   Below-average skill fires: {dc['below_avg_skill_fires']:,} ({100 * dc['below_avg_skill_fires'] / total:.1f}%)")
+    print(f"   Harder hole fires: {dc['harder_hole_fires']:,} ({100 * dc['harder_hole_fires'] / total:.1f}%)")
+
+    # Shift magnitudes
+    print(f"\n2. SHIFT MAGNITUDES")
+    if dc["below_avg_skill_fires"] > 0:
+        avg_skill_shift = dc["skill_shift_sum"] / dc["below_avg_skill_fires"]
+        print(f"   Avg skill shift (when fired): {avg_skill_shift:.6f}")
+    else:
+        print(f"   Avg skill shift: N/A (never fired)")
+
+    if dc["harder_hole_fires"] > 0:
+        avg_diff_shift = dc["diff_shift_sum"] / dc["harder_hole_fires"]
+        print(f"   Avg difficulty shift (when fired): {avg_diff_shift:.6f}")
+    else:
+        print(f"   Avg difficulty shift: N/A (never fired)")
+
+    # Probability changes in skill adjustment block
+    if dc["bogey_before_skill"]:
+        print(f"\n3. SKILL ADJUSTMENT BLOCK (below-average players)")
+        avg_bogey_before = sum(dc["bogey_before_skill"]) / len(dc["bogey_before_skill"])
+        avg_bogey_after = sum(dc["bogey_after_skill"]) / len(dc["bogey_after_skill"])
+        avg_double_before = sum(dc["double_before_skill"]) / len(dc["double_before_skill"])
+        avg_double_after = sum(dc["double_after_skill"]) / len(dc["double_after_skill"])
+
+        print(f"   Bogey:   {avg_bogey_before:.6f} → {avg_bogey_after:.6f} (Δ = {avg_bogey_after - avg_bogey_before:+.6f})")
+        print(f"   Double+: {avg_double_before:.6f} → {avg_double_after:.6f} (Δ = {avg_double_after - avg_double_before:+.6f})")
+
+    # Probability changes in difficulty adjustment block
+    if dc["bogey_before_diff"]:
+        print(f"\n4. DIFFICULTY ADJUSTMENT BLOCK (harder holes)")
+        avg_bogey_before = sum(dc["bogey_before_diff"]) / len(dc["bogey_before_diff"])
+        avg_bogey_after = sum(dc["bogey_after_diff"]) / len(dc["bogey_after_diff"])
+        avg_double_before = sum(dc["double_before_diff"]) / len(dc["double_before_diff"])
+        avg_double_after = sum(dc["double_after_diff"]) / len(dc["double_after_diff"])
+
+        print(f"   Bogey:   {avg_bogey_before:.6f} → {avg_bogey_after:.6f} (Δ = {avg_bogey_after - avg_bogey_before:+.6f})")
+        print(f"   Double+: {avg_double_before:.6f} → {avg_double_after:.6f} (Δ = {avg_double_after - avg_double_before:+.6f})")
+
+    # Normalization impact
+    if dc["bogey_before_norm"]:
+        print(f"\n5. NORMALIZATION IMPACT (all holes)")
+        avg_bogey_before = sum(dc["bogey_before_norm"]) / len(dc["bogey_before_norm"])
+        avg_bogey_after = sum(dc["bogey_after_norm"]) / len(dc["bogey_after_norm"])
+        avg_double_before = sum(dc["double_before_norm"]) / len(dc["double_before_norm"])
+        avg_double_after = sum(dc["double_after_norm"]) / len(dc["double_after_norm"])
+
+        print(f"   Bogey:   {avg_bogey_before:.6f} → {avg_bogey_after:.6f} (Δ = {avg_bogey_after - avg_bogey_before:+.6f})")
+        print(f"   Double+: {avg_double_before:.6f} → {avg_double_after:.6f} (Δ = {avg_double_after - avg_double_before:+.6f})")
+
+        bogey_shrinkage = (avg_bogey_after - avg_bogey_before) / avg_bogey_before * 100 if avg_bogey_before > 0 else 0
+        double_shrinkage = (avg_double_after - avg_double_before) / avg_double_before * 100 if avg_double_before > 0 else 0
+
+        print(f"   Bogey shrinkage: {bogey_shrinkage:+.2f}%")
+        print(f"   Double+ shrinkage: {double_shrinkage:+.2f}%")
+
+    print("\n" + "=" * 70 + "\n")

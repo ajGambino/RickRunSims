@@ -57,12 +57,16 @@ class TournamentDiagnostics:
         if completed_players:
             field_avg = sum(p.total_to_par for p in completed_players) / len(completed_players)
             self.field_avg_scores.append(field_avg)
-
-        # Record cut line (score of last player who made cut)
-        cut_players = [p for p in tournament_result.player_results if p.made_cut]
+        
+        # Record cut line (36-hole score of last player who made cut)
+        cut_players = [p for p in tournament_result.player_results if p.made_cut and len(p.rounds) >= 2]
         if cut_players:
-            cut_line_score = max(p.total_to_par for p in cut_players if len(p.rounds) >= 2)
+            cut_line_score = max(
+                sum(r.score_to_par for r in p.rounds[:2])
+                for p in cut_players)
             self.cut_lines.append(cut_line_score)
+                
+          
 
         # Process each player's rounds for detailed stats
         for player_result in tournament_result.player_results:
